@@ -1,8 +1,47 @@
-import serial
-import struct
+# Copyright (C) 2011 Associated Universities, Inc. Washington DC, USA.
+# 
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# 
+# Correspondence concerning GBT software should be addressed as follows:
+#	GBT Operations
+#	National Radio Astronomy Observatory
+#	P. O. Box 2
+#	Green Bank, WV 24944-0002 USA
 
+"""This module provides a serial interface to the Valon 5007 synthesizer."""
+
+# Python modules
+import struct
+# Third party modules
+import serial
+
+
+__author__ = "Patrick Brandt"
+__copyright__ = "Copyright 2011, Associated Universities, Inc."
+__credits__ = ["Patrick Brandt, Stewart Rumley, Steven Stark"]
+__license__ = "GPL"
+#__version__ = "1.0"
+__maintainer__ = "Patrick Brandt"
+
+
+# Handy aliases
 SYNTH_A = 0x00
 SYNTH_B = 0x08
+
+INT_REF = 0x00
+EXT_REF = 0x01
 
 ACK = 0x06
 NACK = 0x15
@@ -44,10 +83,7 @@ class Synthesizer:
         return ncount, frac, mod, dbf
 
     def get_frequency(self, synth):
-        """get_frequency(unsigned char) -> float
-
-        Returns the current output frequency for the selected synthesizer.
-        """
+        """Returns the current output frequency for the selected synthesizer."""
         self.conn.open()
         bytes = struct.pack('>B', 0x80 | synth)
         self.conn.write(bytes)
@@ -76,7 +112,6 @@ class Synthesizer:
         else:
             frac = 0
             mod = 1
-        #return ncount, frac, mod, dbf
         self.conn.open()
         bytes = struct.pack('>B', 0x80 | synth)
         self.conn.write(bytes)
@@ -137,7 +172,8 @@ class Synthesizer:
         reg0, reg1, reg2, reg3, reg4, reg5 = struct.unpack('>IIIIII', bytes)
         reg2 &= 0x9cffffff
         reg2 |= (((low_spur & 1) << 30) | ((low_spur & 1) << 29) | 
-                 ((double & 1) << 25) | ((half & 1) << 24) | ((r & 0x03ff) << 14))
+                 ((double & 1) << 25) | ((half & 1) << 24) |
+                 ((r & 0x03ff) << 14))
         bytes = struct.pack('>BIIIIII', 0x00 | synth,
                             reg0, reg1, reg2, reg3, reg4, reg5)
         checksum = self._generate_checksum(bytes)
@@ -166,8 +202,7 @@ class Synthesizer:
         """Selects either internal or external reference clock.
 
         Parameters:
-            e_not_i - external reference is used if 1, otherwise
-                      internal reference is selected.
+            e_not_i -- 1 (external) or 0 (internal)
         """
         self.conn.open()
         bytes = struct.pack('>Bc', 0x06, e_not_i & 1)

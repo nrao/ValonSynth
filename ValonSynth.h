@@ -1,4 +1,4 @@
-//# Copyright (C) 2001 Associated Universities, Inc. Washington DC, USA.
+//# Copyright (C) 2011 Associated Universities, Inc. Washington DC, USA.
 //# 
 //# This program is free software; you can redistribute it and/or modify
 //# it under the terms of the GNU General Public License as published by
@@ -28,9 +28,6 @@
 // * write(unsigned char*, int)
 //class Serial;
 #include "Serial.h"
-
-// The code assumes that the effective phase detector frequency is 10MHz.
-const float EPDF = 10.0f;
 
 struct registers
 {
@@ -65,8 +62,8 @@ class Synthesizer
 public:
     enum { A = 0x00,
            B = 0x08,
-           ACK     = 0x06,
-           NACK    = 0x15 };
+           ACK  = 0x06,
+           NACK = 0x15 };
 
     Synthesizer(const char *port);
 

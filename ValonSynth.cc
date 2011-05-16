@@ -1,4 +1,4 @@
-//# Copyright (C) 2001 Associated Universities, Inc. Washington DC, USA.
+//# Copyright (C) 2011 Associated Universities, Inc. Washington DC, USA.
 //# 
 //# This program is free software; you can redistribute it and/or modify
 //# it under the terms of the GNU General Public License as published by
@@ -21,8 +21,11 @@
 //#    Green Bank, WV 24944-0002 USA
 
 #include "Serial.h"
-#include "synthesizer.h"
+#include "ValonSynth.h"
 #include <iostream>
+
+// This code assumes that the effective phase detector frequency is 10MHz.
+const float EPDF = 10.0f;
 
 Synthesizer::Synthesizer(const char *port)
     :
