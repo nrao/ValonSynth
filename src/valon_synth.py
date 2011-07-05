@@ -170,7 +170,7 @@ class Synthesizer:
         checksum = self.conn.read(1)
         #self._verify_checksum(bytes, checksum)
         reg0, reg1, reg2, reg3, reg4, reg5 = struct.unpack('>IIIIII', bytes)
-        reg2 &= 0x9cffffff
+        reg2 &= 0x9c003fff
         reg2 |= (((low_spur & 1) << 30) | ((low_spur & 1) << 29) | 
                  ((double & 1) << 25) | ((half & 1) << 24) |
                  ((r & 0x03ff) << 14))
