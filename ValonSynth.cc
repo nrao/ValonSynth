@@ -190,7 +190,7 @@ Synthesizer::set_options(unsigned char synth, const options &opts)
     //unpack_int(&bytes[12], reg3);
     //unpack_int(&bytes[16], reg4);
     //unpack_int(&bytes[20], reg5);
-    reg2 &= 0x9cffffff;
+    reg2 &= 0x9c003fff;
     reg2 |= (((opts.low_spur & 1) << 30) | ((opts.low_spur & 1) << 29) |
              ((opts.double_ref & 1) << 25) | ((opts.half_ref & 1) << 24) |
              ((opts.r & 0x03ff) << 14));
