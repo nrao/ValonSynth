@@ -22,6 +22,7 @@
 
 CC = g++
 AR = ar
+DOXY = doxygen
 CFLAGS = -c -Wall -fPIC -DLINUX
 LDFLAGS = 
 SOURCES = ValonSynth.cc Serial.cc
@@ -41,8 +42,14 @@ $(STARGET): $(OBJECTS)
 $(DTARGET): $(OBJECTS)
 	$(CC) -shared $(LDFLAGS) $^ -o $@
 
+.PHONY: docs
+docs:
+	$(DOXY) Doxyfile
+
+.PHONY: clean
 clean:
 	rm -rf $(OBJECTS)
 
+.PHONY: clobber
 clobber: clean
 	rm -rf $(STARGET) $(DTARGET)

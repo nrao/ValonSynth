@@ -30,11 +30,11 @@
 // Linux, and Solaris platforms.
 // </summary>
 
-// <prequisite>
+// <prerequisite>
 // <li> The configuration of the serial port that you wish to use (i.e. 
 //      baud rate, parity, port name, etc). 
 // </li>
-// </prequisite>
+// </prerequisite>
 
 // <etymology>
 // This class uses the serial port(s) on your computer for communication.
