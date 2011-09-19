@@ -25,8 +25,6 @@
 #include <iostream>
 #include <cstring>
 
-// This code assumes that the effective phase detector frequency is 10MHz.
-const float EPDF = 10.0f;
 
 ValonSynth::ValonSynth(const char *port)
     :
@@ -50,6 +48,7 @@ ValonSynth::get_frequency(enum ValonSynth::Synthesizer synth, float &frequency)
     if(!verify_checksum(bytes, 24, checksum)) return false;
 #endif//VERIFY_CHECKSUM
     registers regs;
+    float EPDF = getEPDF();
     unpack_freq_registers(bytes, regs);
     frequency = (regs.ncount + float(regs.frac) / regs.mod) * EPDF / regs.dbf;
     return true;
@@ -72,6 +71,7 @@ ValonSynth::set_frequency(enum ValonSynth::Synthesizer synth, float frequency,
     }
     float vco = frequency * dbf;
     registers regs;
+    float EPDF = getEPDF();
     regs.ncount = int(vco / EPDF);
     regs.frac = int((vco - regs.ncount * EPDF) / chan_spacing);
     regs.mod = int(EPDF / chan_spacing + 0.5);
@@ -172,7 +172,7 @@ ValonSynth::get_options(enum ValonSynth::Synthesizer synth, options &opts)
 
 bool
 ValonSynth::set_options(enum ValonSynth::Synthesizer synth,
-                        const struct options &opts)
+                        const options &opts)
 {
     unsigned char bytes[26];
     unsigned char checksum;
@@ -181,24 +181,24 @@ ValonSynth::set_options(enum ValonSynth::Synthesizer synth,
     s.read(&bytes[1], 24);
     s.read(&checksum, 1);
 #ifdef VERIFY_CHECKSUM
-    if(!verify_checksum(bytes, 24, checksum)) return;
+    if(!verify_checksum(&bytes[1], 24, checksum)) return;
 #endif//VERIFY_CHECKSUM
     //unsigned int reg0, reg1;
     unsigned int reg2;
     //unsigned int reg3, reg4, reg5;
-    //unpack_int(&bytes[0], reg0);
-    //unpack_int(&bytes[4], reg1);
-    unpack_int(&bytes[8], reg2);
-    //unpack_int(&bytes[12], reg3);
-    //unpack_int(&bytes[16], reg4);
-    //unpack_int(&bytes[20], reg5);
+    //unpack_int(&bytes[1], reg0);
+    //unpack_int(&bytes[5], reg1);
+    unpack_int(&bytes[9], reg2);
+    //unpack_int(&bytes[13], reg3);
+    //unpack_int(&bytes[17], reg4);
+    //unpack_int(&bytes[21], reg5);
     reg2 &= 0x9c003fff;
     reg2 |= (((opts.low_spur & 1) << 30) | ((opts.low_spur & 1) << 29) |
              ((opts.double_ref & 1) << 25) | ((opts.half_ref & 1) << 24) |
              ((opts.r & 0x03ff) << 14));
     // Write values to hardware
     bytes[0] = 0x00 | synth;
-    pack_int(reg2, &bytes[8]);
+    pack_int(reg2, &bytes[9]);
     bytes[25] = generate_checksum(bytes, 25);
     s.write(bytes, 26);
     s.read(bytes, 1);
@@ -337,6 +337,23 @@ ValonSynth::flash()
     s.write(bytes, 2);
     s.read(bytes, 1);
     return bytes[0] == ACK;
+}
+
+//------------------//
+// EDPF Calculation //
+//------------------//
+float
+ValonSynth::getEPDF()
+{
+    enum Synthesizer synth = A;
+    options opts;
+    float reference = get_reference() / 1e6;
+    get_options(synth, opts);
+
+    if(opts.double_ref) reference *= 2.0;
+    if(opts.half_ref) reference /= 2.0;
+    if(opts.r > 1) reference /= opts.r;
+    return reference;
 }
 
 //----------//

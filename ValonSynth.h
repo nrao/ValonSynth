@@ -153,7 +153,7 @@ public:
      * @param[in] synth The synthesizer to be set.
      * @param[in] frequency The desired output frequency in MHz. The range is
      *                      determined by the minimum and maximum VCO frequency.
-     * @param[in] Chan_spacing The "resolution" of the synthesizer.
+     * @param[in] chan_spacing The "resolution" of the synthesizer.
      **/
     bool set_frequency(enum Synthesizer synth, float frequency,
                         float chan_spacing = 10.0f);
@@ -329,6 +329,9 @@ private:
         unsigned int mod;
         unsigned int dbf;
     };
+
+    // Calculate effective phase detector frequency
+    float getEPDF();
 
     // Checksum
     unsigned char generate_checksum(const unsigned char*, int);
