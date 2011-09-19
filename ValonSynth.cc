@@ -73,7 +73,7 @@ ValonSynth::set_frequency(enum ValonSynth::Synthesizer synth, float frequency,
     registers regs;
     float EPDF = getEPDF();
     regs.ncount = int(vco / EPDF);
-    regs.frac = int((vco - regs.ncount * EPDF) / chan_spacing);
+    regs.frac = int((vco - regs.ncount * EPDF) / chan_spacing + 0.5);
     regs.mod = int(EPDF / chan_spacing + 0.5);
     regs.dbf = dbf;
     // Reduce frac/mod to simplest fraction
