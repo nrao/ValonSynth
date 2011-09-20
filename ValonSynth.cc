@@ -48,7 +48,7 @@ ValonSynth::get_frequency(enum ValonSynth::Synthesizer synth, float &frequency)
     if(!verify_checksum(bytes, 24, checksum)) return false;
 #endif//VERIFY_CHECKSUM
     registers regs;
-    float EPDF = getEPDF();
+    float EPDF = getEPDF(synth);
     unpack_freq_registers(bytes, regs);
     frequency = (regs.ncount + float(regs.frac) / regs.mod) * EPDF / regs.dbf;
     return true;
@@ -71,7 +71,7 @@ ValonSynth::set_frequency(enum ValonSynth::Synthesizer synth, float frequency,
     }
     float vco = frequency * dbf;
     registers regs;
-    float EPDF = getEPDF();
+    float EPDF = getEPDF(synth);
     regs.ncount = int(vco / EPDF);
     regs.frac = int((vco - regs.ncount * EPDF) / chan_spacing + 0.5);
     regs.mod = int(EPDF / chan_spacing + 0.5);
@@ -343,9 +343,8 @@ ValonSynth::flash()
 // EDPF Calculation //
 //------------------//
 float
-ValonSynth::getEPDF()
+ValonSynth::getEPDF(enum ValonSynth::Synthesizer synth)
 {
-    enum Synthesizer synth = A;
     options opts;
     float reference = get_reference() / 1e6;
     get_options(synth, opts);
