@@ -46,10 +46,6 @@ EXT_REF = 0x01
 ACK = 0x06
 NACK = 0x15
 
-# Effective Phase Detector Frequency
-# TODO: Make this dynamic
-EPDF = 10.
-
 class Synthesizer:
     def __init__(self, port):
         self.conn = serial.Serial(None, 9600, serial.EIGHTBITS,
@@ -92,6 +88,7 @@ class Synthesizer:
         self.conn.close()
         #self._verify_checksum(bytes, checksum)
         ncount, frac, mod, dbf = self._unpack_freq_registers(bytes)
+        EPDF = self._getEPDF(synth)
         return (ncount + float(frac) / mod) * EPDF / dbf
 
     def set_frequency(self, synth, freq, chan_spacing = 10.):
@@ -102,8 +99,9 @@ class Synthesizer:
         if dbf > 16:
             dbf = 16
         vco = freq * dbf
+        EPDF = self._getEPDF(synth)
         ncount = int(vco / EPDF)
-        frac = int((vco - ncount * float(EPDF)) / chan_spacing)
+        frac = int((vco - ncount * float(EPDF)) / chan_spacing + 0.5)
         mod = int(EPDF / float(chan_spacing) + 0.5)
         if frac != 0 and mod != 0:
             while not (frac & 1) and not (mod & 1):
@@ -275,3 +273,11 @@ class Synthesizer:
         self.conn.close()
         ack = struct.unpack('>B', bytes)[0]
         return ack == ACK
+
+    def _getEPDF(self, synth):
+        reference = self.get_reference() / 1e6
+        double, half, r, low_spur = self.get_options(synth)
+        if(double): reference *= 2.0
+        if(half):   reference /= 2.0
+        if(r > 1):  reference /= r
+        return reference
