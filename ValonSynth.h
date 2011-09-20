@@ -331,7 +331,7 @@ private:
     };
 
     // Calculate effective phase detector frequency
-    float getEPDF();
+    float getEPDF(enum Synthesizer synth);
 
     // Checksum
     unsigned char generate_checksum(const unsigned char*, int);
