@@ -75,7 +75,7 @@ class Synthesizer:
         ncount = (reg0 >> 15) & 0xffff
         frac = (reg0 >> 3) & 0x0fff
         mod = (reg1 >> 3) & 0x0fff
-        dbf = dbf_rev_table[(reg4 >> 20) & 0x07]
+        dbf = dbf_rev_table.get((reg4 >> 20) & 0x07, 1)
         return ncount, frac, mod, dbf
 
     def get_frequency(self, synth):
@@ -116,7 +116,9 @@ class Synthesizer:
         old_bytes = self.conn.read(24)
         checksum = self.conn.read(1)
         #self._verify_checksum(old_bytes, checksum)
-        bytes = struct.pack('>B24s', 0x00 | synth, self._pack_freq_registers(ncount, frac, mod, dbf, old_bytes))
+        bytes = struct.pack('>B24s', 0x00 | synth,
+                            self._pack_freq_registers(ncount, frac, mod,
+                                                      dbf, old_bytes))
         checksum = self._generate_checksum(bytes)
         self.conn.write(bytes + checksum)
         bytes = self.conn.read(1)
@@ -138,6 +140,42 @@ class Synthesizer:
     def set_reference(self, freq):
         self.conn.open()
         bytes = struct.pack('>BI', 0x01, freq)
+        checksum = self._generate_checksum(bytes)
+        self.conn.write(bytes + checksum)
+        bytes = self.conn.read(1)
+        self.conn.close()
+        ack = struct.unpack('>B', bytes)[0]
+        return ack == ACK
+
+    def get_rf_level(self, synth):
+        rfl_table = {0: -4, 1: -1, 2: 2, 3: 5}
+        self.conn.open()
+        bytes = struct.pack('>B', 0x80 | synth)
+        self.conn.write(bytes)
+        bytes = self.conn.read(24)
+        checksum = self.conn.read(1)
+        self.conn.close()
+        #self._verify_checksum(bytes, checksum)
+        reg0, reg1, reg2, reg3, reg4, reg5 = struct.unpack('>IIIIII', bytes)
+        rfl = (reg4 >> 3) & 0x03
+        rf_level = rfl_table.get(rfl)
+        return rf_level
+
+    def set_rf_level(self, synth, rf_level):
+        rfl_rev_table = {-4: 0, -1: 1, 2: 2, 5: 3}
+        rfl = rfl_rev_table.get(rf_level)
+        if(rfl is None): return False
+        self.conn.open()
+        bytes = struct.pack('>B', 0x80 | synth)
+        self.conn.write(bytes)
+        bytes = self.conn.read(24)
+        checksum = self.conn.read(1)
+        #self._verify_checksum(bytes, checksum)
+        reg0, reg1, reg2, reg3, reg4, reg5 = struct.unpack('>IIIIII', bytes)
+        reg4 &= 0xffffffe7
+        reg4 |= (rfl & 0x03) << 3
+        bytes = struct.pack('BIIIIII', 0x00 | synth,
+                            reg0, reg1, reg2, reg3, reg4, reg5)
         checksum = self._generate_checksum(bytes)
         self.conn.write(bytes + checksum)
         bytes = self.conn.read(1)
@@ -203,7 +241,7 @@ class Synthesizer:
             e_not_i -- 1 (external) or 0 (internal)
         """
         self.conn.open()
-        bytes = struct.pack('>Bc', 0x06, e_not_i & 1)
+        bytes = struct.pack('>BB', 0x06, e_not_i & 1)
         checksum = self._generate_checksum(bytes)
         self.conn.write(bytes + checksum)
         bytes = self.conn.read(1)

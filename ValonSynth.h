@@ -180,13 +180,45 @@ public:
     bool get_reference(unsigned int &reference);
     
     /**
-     * Set the synthesizer reference frequency. This does not appear to change
-     * the actual reference frequency of the synthesizer for either internal or
-     * external reference modes!?
+     * Set the synthesizer reference frequency. This does not change the actual
+     * reference frequency of the synthesizer for either internal or external
+     * reference modes, but serves as a calculation point for other values.
      * @param reference The new reference frequency in Hz.
      * @return True on successful completion.
      **/
     bool set_reference(unsigned int reference);
+
+    /**
+     * \}
+     * \name Methods relating to the RF output level
+     * \{
+     **/
+
+    /**
+     * Get the synthesizer RF output level. The output can be set to four
+     * different levels, -4dbm, -1dbm, 2dbm, and 5dbm.
+     * @param synth The synthesizer to be read.
+     * @return The RF level in dbm.
+     **/
+    int get_rf_level(enum Synthesizer synth);
+
+    /**
+     * Get the synthesizer RF output level. The output can be set to four
+     * different levels, -4dbm, -1dbm, 2dbm, and 5dbm.
+     * @param synth The synthesizer to be read.
+     * @param[out] rf_level The RF level in dbm.
+     * @return True on successful completion.
+     **/
+    bool get_rf_level(enum Synthesizer synth, int &rf_level);
+
+    /**
+     * Set the synthesizer RF output level. The output can be set to four
+     * different levels, -4dbm, -1dbm, 2dbm, and 5dbm.
+     * @param synth The synthesizer to be read.
+     * @param rf_level The RF level in dbm.
+     * @return True on successful completion.
+     **/
+    bool set_rf_level(enum Synthesizer synth, int rf_level);
 
     /**
      * \}
@@ -350,7 +382,7 @@ private:
 };
 
 inline float
-ValonSynth::get_frequency(enum Synthesizer synth)
+ValonSynth::get_frequency(enum ValonSynth::Synthesizer synth)
 {
     float frequency;
     get_frequency(synth, frequency);
@@ -363,6 +395,14 @@ ValonSynth::get_reference()
     unsigned int frequency;
     get_reference(frequency);
     return frequency;
+}
+
+inline int
+ValonSynth::get_rf_level(enum ValonSynth::Synthesizer synth)
+{
+    int rf_level;
+    get_rf_level(synth, rf_level);
+    return rf_level;
 }
 
 inline bool
