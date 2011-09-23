@@ -174,7 +174,7 @@ class Synthesizer:
         reg0, reg1, reg2, reg3, reg4, reg5 = struct.unpack('>IIIIII', bytes)
         reg4 &= 0xffffffe7
         reg4 |= (rfl & 0x03) << 3
-        bytes = struct.pack('BIIIIII', 0x00 | synth,
+        bytes = struct.pack('>BIIIIII', 0x00 | synth,
                             reg0, reg1, reg2, reg3, reg4, reg5)
         checksum = self._generate_checksum(bytes)
         self.conn.write(bytes + checksum)
