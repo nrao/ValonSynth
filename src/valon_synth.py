@@ -307,7 +307,7 @@ class Synthesizer:
         bytes = struct.pack('>B', 0x40)
         checksum = self._generate_checksum(bytes)
         self.conn.write(bytes + checksum)
-        bytes = self.read(1)
+        bytes = self.conn.read(1)
         self.conn.close()
         ack = struct.unpack('>B', bytes)[0]
         return ack == ACK
