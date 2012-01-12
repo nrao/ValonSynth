@@ -24,10 +24,12 @@
 #define SYNTHESIZER_H
 
 // Serial class must support
-// * read(unsigned char*, int)
-// * write(unsigned char*, int)
-//class Serial;
+// * read(uint8_t*, int)
+// * write(uint8_t*, int)
+// class Serial;
 #include "Serial.h"
+#include <cstring>
+#include <stdint.h>
 
 /**
  * Interface to a Valon 5007 dual synthesizer.
@@ -102,7 +104,7 @@ public:
         /**
          * The reference frequency divider value;
          **/
-        unsigned int r;
+        uint32_t r;
     };
 
     /**
@@ -113,12 +115,12 @@ public:
         /**
          * Minimum frequency the VCO is capable of producing.
          **/
-        unsigned short min;
+        uint16_t min;
         
         /**
          * Maximum frequency the VCO is capable of producing.
          **/
-        unsigned short max;
+        uint16_t max;
     };
 
     /**
@@ -156,7 +158,7 @@ public:
      * @param[in] chan_spacing The "resolution" of the synthesizer.
      **/
     bool set_frequency(enum Synthesizer synth, float frequency,
-                        float chan_spacing = 10.0f);
+                       float chan_spacing = 10.0f);
 
     /**
      * \}
@@ -169,7 +171,7 @@ public:
      * channels.
      * @return The reference frequency in Hz.
      **/
-    unsigned int get_reference();
+    uint32_t get_reference();
     
     /**
      * Read the current reference frequency. This is shared between the two
@@ -177,7 +179,7 @@ public:
      * @param[out] reference Receives the reference frequency in Hz.
      * @return True on successful completion.
      **/
-    bool get_reference(unsigned int &reference);
+    bool get_reference(uint32_t &reference);
     
     /**
      * Set the synthesizer reference frequency. This does not change the actual
@@ -186,7 +188,7 @@ public:
      * @param reference The new reference frequency in Hz.
      * @return True on successful completion.
      **/
-    bool set_reference(unsigned int reference);
+    bool set_reference(uint32_t reference);
 
     /**
      * \}
@@ -200,7 +202,7 @@ public:
      * @param synth The synthesizer to be read.
      * @return The RF level in dbm.
      **/
-    int get_rf_level(enum Synthesizer synth);
+    int32_t get_rf_level(enum Synthesizer synth);
 
     /**
      * Get the synthesizer RF output level. The output can be set to four
@@ -209,7 +211,7 @@ public:
      * @param[out] rf_level The RF level in dbm.
      * @return True on successful completion.
      **/
-    bool get_rf_level(enum Synthesizer synth, int &rf_level);
+    bool get_rf_level(enum Synthesizer synth, int32_t &rf_level);
 
     /**
      * Set the synthesizer RF output level. The output can be set to four
@@ -218,7 +220,7 @@ public:
      * @param rf_level The RF level in dbm.
      * @return True on successful completion.
      **/
-    bool set_rf_level(enum Synthesizer synth, int rf_level);
+    bool set_rf_level(enum Synthesizer synth, int32_t rf_level);
 
     /**
      * \}
@@ -356,27 +358,27 @@ private:
 
     struct registers
     {
-        unsigned int ncount;
-        unsigned int frac;
-        unsigned int mod;
-        unsigned int dbf;
+        uint32_t ncount;
+        uint32_t frac;
+        uint32_t mod;
+        uint32_t dbf;
     };
 
     // Calculate effective phase detector frequency
     float getEPDF(enum Synthesizer synth);
 
     // Checksum
-    unsigned char generate_checksum(const unsigned char*, int);
-    bool verify_checksum(const unsigned char*, int, unsigned char);
+    uint8_t generate_checksum(const uint8_t*, size_t);
+    bool verify_checksum(const uint8_t*, size_t, uint8_t);
 
     // Register formatting
-    void pack_freq_registers(const registers &regs, unsigned char *bytes);
-    void unpack_freq_registers(const unsigned char *bytes, registers &regs);
+    void pack_freq_registers(const registers &regs, uint8_t *bytes);
+    void unpack_freq_registers(const uint8_t *bytes, registers &regs);
 
-    void pack_int(unsigned int num, unsigned char *bytes);
-    void pack_short(unsigned short num, unsigned char *bytes);
-    void unpack_int(const unsigned char *bytes, unsigned int &num);
-    void unpack_short(const unsigned char *bytes, unsigned short &num);
+    void pack_int(uint32_t num, uint8_t *bytes);
+    void pack_short(uint16_t num, uint8_t *bytes);
+    void unpack_int(const uint8_t *bytes, uint32_t &num);
+    void unpack_short(const uint8_t *bytes, uint16_t &num);
     
     Serial s;
 };
@@ -389,18 +391,18 @@ ValonSynth::get_frequency(enum ValonSynth::Synthesizer synth)
     return frequency;
 }
 
-inline unsigned int
+inline uint32_t
 ValonSynth::get_reference()
 {
-    unsigned int frequency;
+    uint32_t frequency;
     get_reference(frequency);
     return frequency;
 }
 
-inline int
+inline int32_t
 ValonSynth::get_rf_level(enum ValonSynth::Synthesizer synth)
 {
-    int rf_level;
+    int32_t rf_level;
     get_rf_level(synth, rf_level);
     return rf_level;
 }
