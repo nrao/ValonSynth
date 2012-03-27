@@ -57,10 +57,10 @@
  *      ncount = \lfloor\frac{vco}{EPDF}\rfloor
  * \f]
  * \f[
- *      frac = \lfloor\frac{vco-ncount\times EPDF}{channel_spacing}\rfloor
+ *      frac = \lfloor\frac{vco-ncount\times EPDF}{channel\_spacing}\rfloor
  * \f]
  * \f[
- *      mod = \lfloor\frac{EPDF}{channel_spacing}+0.5\rfloor
+ *      mod = \lfloor\frac{EPDF}{channel\_spacing}+0.5\rfloor
  * \f]
  * 
  * \f$frac\f$ and \f$mod\f$ are a ratio, and can be reduced to the simplest
@@ -198,7 +198,7 @@ public:
 
     /**
      * Get the synthesizer RF output level. The output can be set to four
-     * different levels, -4dbm, -1dbm, 2dbm, and 5dbm.
+     * different levels, -4dBm, -1dBm, 2dBm, and 5dBm.
      * @param synth The synthesizer to be read.
      * @return The RF level in dbm.
      **/
@@ -206,7 +206,7 @@ public:
 
     /**
      * Get the synthesizer RF output level. The output can be set to four
-     * different levels, -4dbm, -1dbm, 2dbm, and 5dbm.
+     * different levels, -4dBm, -1dBm, 2dBm, and 5dBm.
      * @param synth The synthesizer to be read.
      * @param[out] rf_level The RF level in dbm.
      * @return True on successful completion.
@@ -215,7 +215,7 @@ public:
 
     /**
      * Set the synthesizer RF output level. The output can be set to four
-     * different levels, -4dbm, -1dbm, 2dbm, and 5dbm.
+     * different levels, -4dBm, -1dBm, 2dBm, and 5dBm.
      * @param synth The synthesizer to be read.
      * @param rf_level The RF level in dbm.
      * @return True on successful completion.
@@ -336,7 +336,7 @@ public:
     /**
      * Set the label of the specified synthesizer.
      * @param[in] synth The synthesizer to be read.
-     * @param[out] label The new label.
+     * @param[in] label The new label.
      * @return True on successful completion.
      **/
     bool set_label(enum Synthesizer synth, const char *label);
