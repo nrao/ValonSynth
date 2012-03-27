@@ -415,4 +415,12 @@ ValonSynth::get_ref_select()
     return e_not_i;
 }
 
+inline bool
+ValonSynth::get_phase_lock(enum ValonSynth::Synthesizer synth)
+{
+    bool locked;
+    get_phase_lock(synth, locked);
+    return locked;
+}
+
 #endif//SYNTHESIZER_H
