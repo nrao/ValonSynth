@@ -96,7 +96,7 @@ ValonSynth::set_frequency(enum ValonSynth::Synthesizer synth, float frequency,
     s.read(&bytes[1], 24);
     s.read(&checksum, 1);
 #ifdef VERIFY_CHECKSUM
-    if(!verify_checksum(bytes, 24, checksum)) return false;
+    if(!verify_checksum(&bytes[1], 24, checksum)) return false;
 #endif//VERIFY_CHECKSUM
     bytes[0] = 0x00 | synth;
     pack_freq_registers(regs, &bytes[1]);
@@ -339,7 +339,7 @@ ValonSynth::set_vco_range(enum ValonSynth::Synthesizer synth,
     pack_short(vcor.min, &bytes[1]);
     pack_short(vcor.max, &bytes[3]);
     bytes[5] = generate_checksum(bytes, 5);
-    s.write(bytes, 5);
+    s.write(bytes, 6);
     s.read(bytes, 1);
     return bytes[0] == ACK;
 }
