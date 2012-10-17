@@ -20,7 +20,9 @@
 #	P. O. Box 2
 #	Green Bank, WV 24944-0002 USA
 
-"""This module provides a serial interface to the Valon 5007 synthesizer."""
+"""
+Provides a serial interface to the Valon 500x.
+"""
 
 # Python modules
 import struct
@@ -79,7 +81,14 @@ class Synthesizer:
         return ncount, frac, mod, dbf
 
     def get_frequency(self, synth):
-        """Returns the current output frequency for the selected synthesizer."""
+        """
+        Returns the current output frequency for the selected synthesizer.
+
+        @param synth : synthesizer this command affects (0 for 1, 8 for 2).
+        @type  synth : int
+
+        @return: the frequency in MHz (float)
+        """
         self.conn.open()
         bytes = struct.pack('>B', 0x80 | synth)
         self.conn.write(bytes)
@@ -92,6 +101,23 @@ class Synthesizer:
         return (ncount + float(frac) / mod) * EPDF / dbf
 
     def set_frequency(self, synth, freq, chan_spacing = 10.):
+        """
+        Sets the synthesizer to the desired frequency
+
+        Sets to the closest possible frequency, depending on the channel spacing.
+        Range is determined by the minimum and maximum VCO frequency.
+
+        @param synth : synthesizer this command affects (0 for 1, 8 for 2).
+        @type  synth : int
+
+        @param freq : output frequency
+        @type  freq : float
+
+        @param chan_spacing : output frequency increment
+        @type  chan_spacing : float
+
+        @return: True if success (bool)
+        """
         min, max = self.get_vco_range(synth)
         dbf = 1
         while (freq * dbf) <= min and dbf <= 16:
@@ -127,6 +153,9 @@ class Synthesizer:
         return ack == ACK
 
     def get_reference(self):
+        """
+        Get reference frequency in MHz
+        """
         self.conn.open()
         bytes = struct.pack('>B', 0x81)
         self.conn.write(bytes)
@@ -138,6 +167,14 @@ class Synthesizer:
         return freq
 
     def set_reference(self, freq):
+		"""
+		Set reference frequency in MHz
+
+		@param freq : frequency in MHz
+        @type  freq : float
+
+        @return: True if success (bool)
+		"""
         self.conn.open()
         bytes = struct.pack('>BI', 0x01, freq)
         checksum = self._generate_checksum(bytes)
@@ -148,6 +185,14 @@ class Synthesizer:
         return ack == ACK
 
     def get_rf_level(self, synth):
+        """
+        Returns RF level in dBm
+
+        @param synth : synthesizer address, 0 or 8
+        @type  synth : int
+
+        @return: dBm (int)
+        """
         rfl_table = {0: -4, 1: -1, 2: 2, 3: 5}
         self.conn.open()
         bytes = struct.pack('>B', 0x80 | synth)
@@ -162,6 +207,17 @@ class Synthesizer:
         return rf_level
 
     def set_rf_level(self, synth, rf_level):
+        """
+        Set RF level
+
+        @param synth : synthesizer address, 0 or 8
+        @type  synth : int
+
+        @param rf_level : RF power in dBm
+        @type  rf_level : int
+
+        @return: True if success (bool)
+        """
         rfl_rev_table = {-4: 0, -1: 1, 2: 2, 5: 3}
         rfl = rfl_rev_table.get(rf_level)
         if(rfl is None): return False
@@ -184,6 +240,20 @@ class Synthesizer:
         return ack == ACK
 
     def get_options(self, synth):
+        """
+        Get options tuple:
+
+        bool double:   if True, reference frequency is doubled
+        bool half:     if True, reference frequency is halved
+        int  r:        reference frequency divisor
+        bool low_spur: if True, minimizes PLL spurs;
+                       if False, minimizes phase noise
+        double and half both True is same as both False.
+
+        @param synth : synthesizer address
+
+        @return: double (bool), half (bool), r (int), low_spur (bool)
+        """
         self.conn.open()
         bytes = struct.pack('>B', 0x80 | synth)
         self.conn.write(bytes)
@@ -199,6 +269,29 @@ class Synthesizer:
         return double, half, r, low_spur
 
     def set_options(self, synth, double = 0, half = 0, r = 1, low_spur = 0):
+        """
+        Set options.
+        
+        double and half both True is same as both False.
+
+        @param synth : synthesizer base address
+        @type  synth : int
+        
+        @param double : if 1, reference frequency is doubled; default 0
+        @type  double : int
+        
+        @param half : if 1, reference frequency is halved; default 0
+        @type  half : int
+        
+        @param r : reference frequency divisor; default 1
+        @type  r : int
+        
+        @param low_spur : if 1, minimizes PLL spurs;
+                          if 0, minimizes phase noise; default 0
+        @type  low_spur : int
+
+        @return: True if success (bool)
+        """
         self.conn.open()
         bytes = struct.pack('>B', 0x80 | synth)
         self.conn.write(bytes)
@@ -235,10 +328,13 @@ class Synthesizer:
         return is_ext & 1
 
     def set_ref_select(self, e_not_i = 1):
-        """Selects either internal or external reference clock.
+        """
+        Selects either internal or external reference clock.
 
-        Parameters:
-            e_not_i -- 1 (external) or 0 (internal)
+        @param e_not_i : 1 (external) or 0 (internal); default 1
+        @type  e_not_i : int
+
+        @return: True if success (bool)
         """
         self.conn.open()
         bytes = struct.pack('>BB', 0x06, e_not_i & 1)
@@ -250,6 +346,14 @@ class Synthesizer:
         return ack == ACK
 
     def get_vco_range(self, synth):
+        """
+        Returns (min, max) VCO range tuple.
+
+        @param synth : synthesizer base address
+        @type  synth : int
+
+        @return: min,max in MHz
+        """
         self.conn.open()
         bytes = struct.pack('>B', 0x83 | synth)
         self.conn.write(bytes)
@@ -261,6 +365,20 @@ class Synthesizer:
         return min, max
 
     def set_vco_range(self, synth, min, max):
+        """
+        Sets VCO range.
+
+        @param synth : synthesizer base address
+        @type  synth : int
+
+        @param min : minimum VCO frequency
+        @type  min : int
+
+        @param max : maximum VCO frequency
+        @type  max : int
+
+        @return: True if success (bool)
+        """
         self.conn.open()
         bytes = struct.pack('>BHH', 0x03 | synth, min, max)
         checksum = self._generate_checksum(bytes)
@@ -271,6 +389,14 @@ class Synthesizer:
         return ack == ACK
 
     def get_phase_lock(self, synth):
+        """
+        Get phase lock status
+
+        @param synth : synthesizer base address
+        @type  synth : int
+
+        @return: True if locked (bool)
+        """
         self.conn.open()
         bytes = struct.pack('>B', 0x86 | synth)
         self.conn.write(bytes)
@@ -283,6 +409,14 @@ class Synthesizer:
         return lock > 0
 
     def get_label(self, synth):
+        """
+        Get synthesizer label or name
+
+        @param synth : synthesizer base address
+        @type  synth : int
+
+        @return: str
+        """
         self.conn.open()
         bytes = struct.pack('>B', 0x82 | synth)
         self.conn.write(bytes)
@@ -293,6 +427,17 @@ class Synthesizer:
         return bytes
 
     def set_label(self, synth, label):
+        """
+        Set synthesizer label or name
+
+        @param synth : synthesizer base address
+        @type  synth : int
+
+        @param label : up to 16 bytes of text
+        @type  label : str
+        
+        @return: True if success (bool)
+        """
         self.conn.open()
         bytes = struct.pack('>B16s', 0x02 | synth, label)
         checksum = self._generate_checksum(bytes)
@@ -303,6 +448,11 @@ class Synthesizer:
         return ack == ACK
 
     def flash(self):
+        """
+        Flash current settings for both synthesizers into non-volatile memory.
+
+        @return: True if success (bool)
+        """
         self.conn.open()
         bytes = struct.pack('>B', 0x40)
         checksum = self._generate_checksum(bytes)
@@ -313,6 +463,11 @@ class Synthesizer:
         return ack == ACK
 
     def _getEPDF(self, synth):
+        """
+        Returns effective phase detector frequency.
+
+        This is the reference frequency with options applied.
+        """
         reference = self.get_reference() / 1e6
         double, half, r, low_spur = self.get_options(synth)
         if(double): reference *= 2.0
