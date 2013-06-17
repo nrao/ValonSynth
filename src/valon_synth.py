@@ -174,7 +174,7 @@ class Synthesizer:
         @type  freq : float
 
         @return: True if success (bool)
-		"""
+        """
         self.conn.open()
         bytes = struct.pack('>BI', 0x01, freq)
         checksum = self._generate_checksum(bytes)
