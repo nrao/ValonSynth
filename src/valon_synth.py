@@ -167,10 +167,10 @@ class Synthesizer:
         return freq
 
     def set_reference(self, freq):
-		"""
-		Set reference frequency in MHz
+        """
+        Set reference frequency in MHz
 
-		@param freq : frequency in MHz
+        @param freq : frequency in MHz
         @type  freq : float
 
         @return: True if success (bool)
