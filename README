@@ -1,0 +1,10 @@
+This branch is a testbed for experimental features.
+
+This software provides ABSOLUTELY NO GUARANTEE that you will not brick or otherwise render your Valon inoperable if you use it, correctly or incorrectly.
+
+User beware.
+
+2015-05-06:
+
+* Added a means to set all the options present in the Valon configuration registers.
+* Enabled checksum verification.
