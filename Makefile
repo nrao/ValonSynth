@@ -23,8 +23,8 @@
 CC = g++
 AR = ar
 DOXY = doxygen
-CFLAGS = -c -Wall -fPIC -DLINUX
-LDFLAGS = 
+CFLAGS = -c -Wall -fPIC -DLINUX -std=c++0x
+LDFLAGS =
 SOURCES = ValonSynth.cc Serial.cc
 OBJECTS = $(SOURCES:.cc=.o)
 PLATFORM = LINUX

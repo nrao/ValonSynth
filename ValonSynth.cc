@@ -36,20 +36,11 @@ ValonSynth::ValonSynth(const char *port)
 bool
 ValonSynth::get_frequency(enum ValonSynth::Synthesizer synth, float &frequency)
 {
-    uint8_t bytes[24];
-    uint8_t checksum;
-    bytes[0] = 0x80 | synth;
-    s.write(bytes, 1);
-    s.read(bytes, 24);
-    s.read(&checksum, 1);
-#ifdef VERIFY_CHECKSUM
-    if(!verify_checksum(bytes, 24, checksum)) return false;
-#endif//VERIFY_CHECKSUM
-    registers regs;
+    std::uint32_t ncount, frac, mod, dbf;
+    bool success = read_freq_registers(synth, ncount, frac, mod, dbf);
     float EPDF = getEPDF(synth);
-    unpack_freq_registers(bytes, regs);
-    frequency = (regs.ncount + float(regs.frac) / regs.mod) * EPDF / regs.dbf;
-    return true;
+    frequency = (ncount + float(frac) / mod) * EPDF / dbf;
+    return success;
 }
 
 bool
@@ -57,8 +48,8 @@ ValonSynth::set_frequency(enum ValonSynth::Synthesizer synth, float frequency,
                           float chan_spacing)
 {
     vco_range vcor;
-    int32_t dbf = 1;
-    get_vco_range(synth, vcor);
+    std::uint32_t dbf = 1;
+    bool success = get_vco_range(synth, vcor);
     while(((frequency * dbf) <= vcor.min) && (dbf <= 16))
     {
         dbf *= 2;
@@ -68,52 +59,35 @@ ValonSynth::set_frequency(enum ValonSynth::Synthesizer synth, float frequency,
         dbf = 16;
     }
     float vco = frequency * dbf;
-    registers regs;
     float EPDF = getEPDF(synth);
-    regs.ncount = int32_t(vco / EPDF);
-    regs.frac = int32_t((vco - regs.ncount * EPDF) / chan_spacing + 0.5);
-    regs.mod = int32_t(EPDF / chan_spacing + 0.5);
-    regs.dbf = dbf;
+    std::uint32_t ncount = std::uint32_t(vco / EPDF);
+    std::uint32_t frac = std::uint32_t((vco - ncount * EPDF) / chan_spacing + 0.5);
+    std::uint32_t mod = std::uint32_t(EPDF / chan_spacing + 0.5);
     // Reduce frac/mod to simplest fraction
-    if((regs.frac != 0) && (regs.mod != 0))
+    if((frac != 0) && (mod != 0))
     {
-        while(!(regs.frac & 1) && !(regs.mod & 1))
+        while(!(frac & 1) && !(mod & 1))
         {
-            regs.frac /= 2;
-            regs.mod /= 2;
+            frac /= 2;
+            mod /= 2;
         }
     }
     else
     {
-        regs.frac = 0;
-        regs.mod = 1;
+        frac = 0;
+        mod = 1;
     }
-    // Write values to hardware
-    uint8_t bytes[26];
-    uint8_t checksum;
-    bytes[0] = 0x80 | synth;
-    s.write(bytes, 1);
-    s.read(&bytes[1], 24);
-    s.read(&checksum, 1);
-#ifdef VERIFY_CHECKSUM
-    if(!verify_checksum(&bytes[1], 24, checksum)) return false;
-#endif//VERIFY_CHECKSUM
-    bytes[0] = 0x00 | synth;
-    pack_freq_registers(regs, &bytes[1]);
-    bytes[25] = generate_checksum(bytes, 25);
-    s.write(bytes, 26);
-    s.read(bytes, 1);
-    return bytes[0] == ACK;
+    return success && write_freq_registers(synth, ncount, frac, mod, dbf);
 }
 
 //---------------------//
 // Reference Frequency //
 //---------------------//
 bool
-ValonSynth::get_reference(uint32_t &frequency)
+ValonSynth::get_reference(std::uint32_t &frequency)
 {
-    uint8_t bytes[4];
-    uint8_t checksum;
+    std::uint8_t bytes[4];
+    std::uint8_t checksum;
     bytes[0] = 0x81;
     s.write(bytes, 1);
     s.read(bytes, 4);
@@ -126,9 +100,9 @@ ValonSynth::get_reference(uint32_t &frequency)
 }
 
 bool
-ValonSynth::set_reference(uint32_t frequency)
+ValonSynth::set_reference(std::uint32_t frequency)
 {
-    uint8_t bytes[6];
+    std::uint8_t bytes[6];
     bytes[0] = 0x01;
     pack_int(frequency, &bytes[1]);
     bytes[5] = generate_checksum(bytes, 5);
@@ -141,41 +115,29 @@ ValonSynth::set_reference(uint32_t frequency)
 // RF Level //
 //----------//
 bool
-ValonSynth::get_rf_level(enum ValonSynth::Synthesizer synth, int32_t &rf_level)
+ValonSynth::get_rf_level(enum ValonSynth::Synthesizer synth, std::int32_t &rf_level)
 {
-    uint8_t bytes[24];
-    uint8_t checksum;
-    bytes[0] = 0x80 | synth;
-    s.write(bytes, 1);
-    s.read(bytes, 24);
-    s.read(&checksum, 1);
-#ifdef VERIFY_CHECKSUM
-    if(!verify_checksum(bytes, 24, checksum)) return false;
-#endif//VERIFY_CHECKSUM
-    //uint32_t reg0, reg1, reg2, reg3;
-    uint32_t reg4;
-    //uint32_t reg5;
-    //unpack_int(&bytes[0], reg0);
-    //unpack_int(&bytes[4], reg1);
-    //unpack_int(&bytes[8], reg2);
-    //unpack_int(&bytes[12], reg3);
-    unpack_int(&bytes[16], reg4);
-    //unpack_int(&bytes[20], reg5);
-    int32_t rfl = (reg4 >> 3) & 0x03;
-    switch(rfl)
+    reg0_t r0;
+    reg1_t r1;
+    reg2_t r2;
+    reg3_t r3;
+    reg4_t r4;
+    reg5_t r5;
+    bool success = get_all_registers(synth, r0, r1, r2, r3, r4, r5);
+    switch(static_cast<std::uint32_t>(r4.output_power))
     {
     case 0: rf_level = -4; break;
     case 1: rf_level = -1; break;
     case 2: rf_level =  2; break;
     case 3: rf_level =  5; break;
     }
-    return true;
+    return success;
 }
 
 bool
 ValonSynth::set_rf_level(enum ValonSynth::Synthesizer synth, int32_t rf_level)
 {
-    int32_t rfl = 0;
+    std::uint32_t rfl;
     switch(rf_level)
     {
     case -4: rfl = 0; break;
@@ -184,33 +146,15 @@ ValonSynth::set_rf_level(enum ValonSynth::Synthesizer synth, int32_t rf_level)
     case 5:  rfl = 3; break;
     default: return false;
     }
-    uint8_t bytes[26];
-    uint8_t checksum;
-    bytes[0] = 0x80 | synth;
-    s.write(bytes, 1);
-    s.read(&bytes[1], 24);
-    s.read(&checksum, 1);
-#ifdef VERIFY_CHECKSUM
-    if(!verify_checksum(&bytes[1], 24, checksum)) return;
-#endif//VERIFY_CHECKSUM
-    //uint32_t reg0, reg1, reg2, reg3;
-    uint32_t reg4;
-    //uint32_t reg5;
-    //unpack_int(&bytes[1], reg0);
-    //unpack_int(&bytes[5], reg1);
-    //unpack_int(&bytes[9], reg2);
-    //unpack_int(&bytes[13], reg3);
-    unpack_int(&bytes[17], reg4);
-    //unpack_int(&bytes[21], reg5);
-    reg4 &= 0xffffffe7;
-    reg4 |= (rfl & 0x03) << 3;
-    // Write values to hardware
-    bytes[0] = 0x00 | synth;
-    pack_int(reg4, &bytes[17]);
-    bytes[25] = generate_checksum(bytes, 25);
-    s.write(bytes, 26);
-    s.read(bytes, 1);
-    return bytes[0] == ACK;
+    reg0_t r0;
+    reg1_t r1;
+    reg2_t r2;
+    reg3_t r3;
+    reg4_t r4;
+    reg5_t r5;
+    bool success = get_all_registers(synth, r0, r1, r2, r3, r4, r5);
+    r4.output_power = rfl;
+    return success && set_all_registers(synth, r0, r1, r2, r3, r4, r5);
 }
 
 //---------------------//
@@ -219,64 +163,37 @@ ValonSynth::set_rf_level(enum ValonSynth::Synthesizer synth, int32_t rf_level)
 bool
 ValonSynth::get_options(enum ValonSynth::Synthesizer synth, options &opts)
 {
-    uint8_t bytes[24];
-    uint8_t checksum;
-    bytes[0] = 0x80 | synth;
-    s.write(bytes, 1);
-    s.read(bytes, 24);
-    s.read(&checksum, 1);
-#ifdef VERIFY_CHECKSUM
-    if(!verify_checksum(bytes, 24, checksum)) return false;
-#endif//VERIFY_CHECKSUM
-    //uint32_t reg0, reg1;
-    uint32_t reg2;
-    //uint32_t reg3, reg4, reg5;
-    //unpack_int(&bytes[0], reg0);
-    //unpack_int(&bytes[4], reg1);
-    unpack_int(&bytes[8], reg2);
-    //unpack_int(&bytes[12], reg3);
-    //unpack_int(&bytes[16], reg4);
-    //unpack_int(&bytes[20], reg5);
-    opts.low_spur = ((reg2 >> 30) & 1) & ((reg2 >> 29) & 1);
-    opts.double_ref = (reg2 >> 25) & 1;
-    opts.half_ref = (reg2 >> 24) & 1;
-    opts.r = (reg2 >> 14) & 0x03ff;
-    return true;
+    reg0_t r0;
+    reg1_t r1;
+    reg2_t r2;
+    reg3_t r3;
+    reg4_t r4;
+    reg5_t r5;
+    bool success = get_all_registers(synth, r0, r1, r2, r3, r4, r5);
+    opts.double_ref = r2.double_r;
+    opts.half_ref   = r2.half_r;
+    opts.r          = r2.r;
+    opts.low_spur   = bool(r2.low_spur);
+    return success;
 }
 
 bool
 ValonSynth::set_options(enum ValonSynth::Synthesizer synth,
                         const options &opts)
 {
-    uint8_t bytes[26];
-    uint8_t checksum;
-    bytes[0] = 0x80 | synth;
-    s.write(bytes, 1);
-    s.read(&bytes[1], 24);
-    s.read(&checksum, 1);
-#ifdef VERIFY_CHECKSUM
-    if(!verify_checksum(&bytes[1], 24, checksum)) return;
-#endif//VERIFY_CHECKSUM
-    //uint32_t reg0, reg1;
-    uint32_t reg2;
-    //uint32_t reg3, reg4, reg5;
-    //unpack_int(&bytes[1], reg0);
-    //unpack_int(&bytes[5], reg1);
-    unpack_int(&bytes[9], reg2);
-    //unpack_int(&bytes[13], reg3);
-    //unpack_int(&bytes[17], reg4);
-    //unpack_int(&bytes[21], reg5);
-    reg2 &= 0x9c003fff;
-    reg2 |= (((opts.low_spur & 1) << 30) | ((opts.low_spur & 1) << 29) |
-             ((opts.double_ref & 1) << 25) | ((opts.half_ref & 1) << 24) |
-             ((opts.r & 0x03ff) << 14));
-    // Write values to hardware
-    bytes[0] = 0x00 | synth;
-    pack_int(reg2, &bytes[9]);
-    bytes[25] = generate_checksum(bytes, 25);
-    s.write(bytes, 26);
-    s.read(bytes, 1);
-    return bytes[0] == ACK;
+    reg0_t r0;
+    reg1_t r1;
+    reg2_t r2;
+    reg3_t r3;
+    reg4_t r4;
+    reg5_t r5;
+    bool success = get_all_registers(synth, r0, r1, r2, r3, r4, r5);
+    r2.double_r = opts.double_ref;
+    r2.half_r   = opts.half_ref;
+    r2.r        = opts.r;
+    // Value must be either 0x0 or 0x3
+    r2.low_spur = opts.low_spur ? 3 : 0;
+    return success && set_all_registers(synth, r0, r1, r2, r3, r4, r5);
 }
 
 //------------------//
@@ -285,8 +202,8 @@ ValonSynth::set_options(enum ValonSynth::Synthesizer synth,
 bool
 ValonSynth::get_ref_select(bool &e_not_i)
 {
-    uint8_t bytes;
-    uint8_t checksum;
+    std::uint8_t bytes;
+    std::uint8_t checksum;
     bytes = 0x86;
     s.write(&bytes, 1);
     s.read(&bytes, 1);
@@ -301,7 +218,7 @@ ValonSynth::get_ref_select(bool &e_not_i)
 bool
 ValonSynth::set_ref_select(bool e_not_i)
 {
-    uint8_t bytes[3];
+    std::uint8_t bytes[3];
     bytes[0] = 0x06;
     bytes[1] = e_not_i & 1;
     bytes[2] = generate_checksum(bytes, 2);
@@ -316,8 +233,8 @@ ValonSynth::set_ref_select(bool e_not_i)
 bool
 ValonSynth::get_vco_range(enum ValonSynth::Synthesizer synth, vco_range &vcor)
 {
-    uint8_t bytes[4];
-    uint8_t checksum;
+    std::uint8_t bytes[4];
+    std::uint8_t checksum;
     bytes[0] = 0x83 | synth;
     s.write(bytes, 1);
     s.read(bytes, 4);
@@ -334,7 +251,7 @@ bool
 ValonSynth::set_vco_range(enum ValonSynth::Synthesizer synth,
                           const vco_range &vcor)
 {
-    uint8_t bytes[6];
+    std::uint8_t bytes[6];
     bytes[0] = 0x03 | synth;
     pack_short(vcor.min, &bytes[1]);
     pack_short(vcor.max, &bytes[3]);
@@ -350,8 +267,8 @@ ValonSynth::set_vco_range(enum ValonSynth::Synthesizer synth,
 bool
 ValonSynth::get_phase_lock(enum ValonSynth::Synthesizer synth, bool &locked)
 {
-    uint8_t bytes;
-    uint8_t checksum;
+    std::uint8_t bytes;
+    std::uint8_t checksum;
     bytes = 0x86 | synth;
     s.write(&bytes, 1);
     s.read(&bytes, 1);
@@ -359,7 +276,7 @@ ValonSynth::get_phase_lock(enum ValonSynth::Synthesizer synth, bool &locked)
 #ifdef VERIFY_CHECKSUM
     if(!verify_checksum(&bytes, 1, checksum)) return false;
 #endif//VERIFY_CHECKSUM
-    int32_t mask;
+    std::uint32_t mask;
     // ValonSynth A
     if(synth == ValonSynth::A) mask = 0x20;
     // ValonSynth B
@@ -374,8 +291,8 @@ ValonSynth::get_phase_lock(enum ValonSynth::Synthesizer synth, bool &locked)
 bool
 ValonSynth::get_label(enum ValonSynth::Synthesizer synth, char *label)
 {
-    uint8_t bytes[16];
-    uint8_t checksum;
+    std::uint8_t bytes[16];
+    std::uint8_t checksum;
     bytes[0] = 0x82 | synth;
     s.write(bytes, 1);
     s.read(bytes, 16);
@@ -390,7 +307,7 @@ ValonSynth::get_label(enum ValonSynth::Synthesizer synth, char *label)
 bool
 ValonSynth::set_label(enum ValonSynth::Synthesizer synth, const char *label)
 {
-    uint8_t bytes[18];
+    std::uint8_t bytes[18];
     bytes[0] = 0x02 | synth;
     memcpy(&bytes[1], label, 16);
     bytes[17] = generate_checksum(bytes, 17);
@@ -405,7 +322,7 @@ ValonSynth::set_label(enum ValonSynth::Synthesizer synth, const char *label)
 bool
 ValonSynth::flash()
 {
-    uint8_t bytes[2];
+    std::uint8_t bytes[2];
     bytes[0] = 0x40;
     bytes[1] = generate_checksum(bytes, 1);
     s.write(bytes, 2);
@@ -432,11 +349,11 @@ ValonSynth::getEPDF(enum ValonSynth::Synthesizer synth)
 //----------//
 // Checksum //
 //----------//
-uint8_t
-ValonSynth::generate_checksum(const uint8_t *bytes, size_t length)
+std::uint8_t
+ValonSynth::generate_checksum(const std::uint8_t *bytes, std::size_t length)
 {
-    uint32_t sum = 0;
-    for(size_t i = 0; i < length; ++i)
+    std::uint32_t sum = 0;
+    for(std::size_t i = 0; i < length; ++i)
     {
         sum += bytes[i];
     }
@@ -444,7 +361,8 @@ ValonSynth::generate_checksum(const uint8_t *bytes, size_t length)
 }
 
 bool
-ValonSynth::verify_checksum(const uint8_t *bytes, size_t length, uint8_t checksum)
+ValonSynth::verify_checksum(const std::uint8_t *bytes, std::size_t length,
+                            std::uint8_t checksum)
 {
     return (generate_checksum(bytes, length) == checksum);
 }
@@ -452,72 +370,106 @@ ValonSynth::verify_checksum(const uint8_t *bytes, size_t length, uint8_t checksu
 //-------------//
 // Bit Packing //
 //-------------//
-void
-ValonSynth::pack_freq_registers(const registers &regs, uint8_t *bytes)
-{
-    int32_t dbf = 0;
-    switch(regs.dbf)
-    {
-    case 1: dbf = 0; break;
-    case 2: dbf = 1; break;
-    case 4: dbf = 2; break;
-    case 8: dbf = 3; break;
-    case 16: dbf = 4; break;
-    }
-    uint32_t reg0, reg1;
-    //uint32_t reg2, reg3;
-    uint32_t reg4;
-    //uint32_t reg5;
-    unpack_int(&bytes[0], reg0);
-    unpack_int(&bytes[4], reg1);
-    //unpack_int(&bytes[8], reg2);
-    //unpack_int(&bytes[12], reg3);
-    unpack_int(&bytes[16], reg4);
-    //unpack_int(&bytes[20], reg5);
-    reg0 &= 0x80000007;
-    reg0 |= ((regs.ncount & 0xffff) << 15) | ((regs.frac & 0x0fff) << 3);
-    reg1 &= 0xffff8007;
-    reg1 |= (regs.mod & 0x0fff) << 3;
-    reg4 &= 0xff8fffff;
-    reg4 |= dbf << 20;
-    pack_int(reg0, &bytes[0]);
-    pack_int(reg1, &bytes[4]);
-    //pack_int(reg2, &bytes[8]);
-    //pack_int(reg3, &bytes[12]);
-    pack_int(reg4, &bytes[16]);
-    //pack_int(reg5, &bytes[20]);
-}
-
-void
-ValonSynth::unpack_freq_registers(const uint8_t *bytes, registers &regs)
-{
-    uint32_t reg0, reg1;
-    //uint32_t reg2, reg3;
-    uint32_t reg4;
-    //uint32_t reg5;
-    unpack_int(&bytes[0], reg0);
-    unpack_int(&bytes[4], reg1);
-    //unpack_int(&bytes[8], reg2);
-    //unpack_int(&bytes[12], reg3);
-    unpack_int(&bytes[16], reg4);
-    //unpack_int(&bytes[20], reg5);
-    regs.ncount = (reg0 >> 15) & 0xffff;
-    regs.frac = (reg0 >> 3) & 0x0fff;
-    regs.mod = (reg1 >> 3) & 0x0fff;
-    int32_t dbf = (reg4 >> 20) & 0x07;
+bool ValonSynth::write_freq_registers(enum ValonSynth::Synthesizer synth,
+                                      std::uint32_t ncount, std::uint32_t frac,
+                                      std::uint32_t mod, std::uint32_t dbf) {
+    std::uint32_t raw_dbf;
     switch(dbf)
     {
-    case 0: regs.dbf = 1; break;
-    case 1: regs.dbf = 2; break;
-    case 2: regs.dbf = 4; break;
-    case 3: regs.dbf = 8; break;
-    case 4: regs.dbf = 16; break;
-    default: regs.dbf = 1;
+    case  1: raw_dbf = 0; break;
+    case  2: raw_dbf = 1; break;
+    case  4: raw_dbf = 2; break;
+    case  8: raw_dbf = 3; break;
+    case 16: raw_dbf = 4; break;
     }
+
+    reg0_t r0;
+    reg1_t r1;
+    reg2_t r2;
+    reg3_t r3;
+    reg4_t r4;
+    reg5_t r5;
+
+    bool success = get_all_registers(synth, r0, r1, r2, r3, r4, r5);
+
+    r0.ncount = ncount;
+    r0.frac = frac;
+    r1.mod = mod;
+    r4.divider_select = raw_dbf;
+
+    return success && set_all_registers(synth, r0, r1, r2, r3, r4, r5);
+}
+
+bool ValonSynth::read_freq_registers(enum ValonSynth::Synthesizer synth,
+                                     std::uint32_t &ncount, std::uint32_t &frac,
+                                     std::uint32_t &mod, std::uint32_t &dbf) {
+    reg0_t r0;
+    reg1_t r1;
+    reg2_t r2;
+    reg3_t r3;
+    reg4_t r4;
+    reg5_t r5;
+
+    bool success = get_all_registers(synth, r0, r1, r2, r3, r4, r5);
+
+    ncount = r0.ncount;
+    frac = r0.frac;
+    mod = r1.mod;
+    switch(static_cast<std::uint32_t>(r4.divider_select))
+    {
+    case  0: dbf = 1; break;
+    case  1: dbf = 2; break;
+    case  2: dbf = 4; break;
+    case  3: dbf = 8; break;
+    case  4: dbf = 16; break;
+    default: dbf = 1;
+    }
+
+    return success;
+}
+
+bool ValonSynth::get_all_registers(enum ValonSynth::Synthesizer synth,
+                       reg0_t &r0, reg1_t &r1,
+                       reg2_t &r2, reg3_t &r3,
+                       reg4_t &r4, reg5_t &r5) {
+    std::uint8_t bytes[24];
+    std::uint8_t checksum;
+    bytes[0] = 0x80 | synth;
+    s.write(bytes, 1);
+    s.read(bytes, 24);
+    s.read(&checksum, 1);
+#ifdef VERIFY_CHECKSUM
+    if(!verify_checksum(bytes, 24, checksum)) return false;
+#endif//VERIFY_CHECKSUM
+    unpack_int(&bytes[ 0], r0.asbyte);
+    unpack_int(&bytes[ 4], r1.asbyte);
+    unpack_int(&bytes[ 8], r2.asbyte);
+    unpack_int(&bytes[12], r3.asbyte);
+    unpack_int(&bytes[16], r4.asbyte);
+    unpack_int(&bytes[20], r5.asbyte);
+    return true;
+}
+
+bool ValonSynth::set_all_registers(enum ValonSynth::Synthesizer synth,
+                                   const reg0_t &r0, const reg1_t &r1,
+                                   const reg2_t &r2, const reg3_t &r3,
+                                   const reg4_t &r4, const reg5_t &r5) {
+    std::uint8_t bytes[26];
+    bytes[0] = 0x00 | synth;
+    pack_int(r0.asbyte, &bytes[0]);
+    pack_int(r1.asbyte, &bytes[4]);
+    pack_int(r2.asbyte, &bytes[8]);
+    pack_int(r3.asbyte, &bytes[12]);
+    pack_int(r4.asbyte, &bytes[16]);
+    pack_int(r5.asbyte, &bytes[20]);
+    bytes[25] = generate_checksum(bytes, 25);
+    s.write(bytes, 26);
+    s.read(bytes, 1);
+    return bytes[0] == ACK;
 }
 
 void
-ValonSynth::pack_int(uint32_t num, uint8_t *bytes)
+ValonSynth::pack_int(std::uint32_t num, std::uint8_t *bytes)
 {
     bytes[0] = (num >> 24) & 0xff;
     bytes[1] = (num >> 16) & 0xff;
@@ -526,21 +478,21 @@ ValonSynth::pack_int(uint32_t num, uint8_t *bytes)
 }
 
 void
-ValonSynth::pack_short(uint16_t num, uint8_t *bytes)
+ValonSynth::pack_short(std::uint16_t num, std::uint8_t *bytes)
 {
     bytes[0] = (num >> 8) & 0xff;
     bytes[1] = (num) & 0xff;
 }
 
 void
-ValonSynth::unpack_int(const uint8_t *bytes, uint32_t &num)
+ValonSynth::unpack_int(const std::uint8_t *bytes, std::uint32_t &num)
 {
-    num = ((uint32_t(bytes[0]) << 24) + (uint32_t(bytes[1]) << 16) +
-           (uint32_t(bytes[2]) <<  8) + (uint32_t(bytes[3])));
+    num = ((std::uint32_t(bytes[0]) << 24) + (std::uint32_t(bytes[1]) << 16) +
+           (std::uint32_t(bytes[2]) <<  8) + (std::uint32_t(bytes[3])));
 }
 
 void
-ValonSynth::unpack_short(const uint8_t *bytes, uint16_t &num)
+ValonSynth::unpack_short(const std::uint8_t *bytes, std::uint16_t &num)
 {
-    num = (uint16_t(bytes[0]) << 8) + uint16_t(bytes[1]);
+    num = (std::uint16_t(bytes[0]) << 8) + std::uint16_t(bytes[1]);
 }

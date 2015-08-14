@@ -24,12 +24,13 @@
 #define SYNTHESIZER_H
 
 // Serial class must support
-// * read(uint8_t*, int)
-// * write(uint8_t*, int)
+// * read(std::uint8_t*, size_t)
+// * write(std::uint8_t*, size_t)
 // class Serial;
 #include "Serial.h"
+#include "ValonRegisters.h"
 #include <cstring>
-#include <stdint.h>
+#include <cstdint>
 
 /**
  * Interface to a Valon 5007 dual synthesizer.
@@ -90,21 +91,21 @@ public:
          * this mode it is in "low noise" mode.
          **/
         bool low_spur;
-        
+
         /**
          * The reference frequency doubler is active.
          **/
         bool double_ref;
-        
+
         /**
          * The reference frequency halver is active.
          **/
         bool half_ref;
-        
+
         /**
          * The reference frequency divider value;
          **/
-        uint32_t r;
+        std::uint32_t r;
     };
 
     /**
@@ -115,12 +116,12 @@ public:
         /**
          * Minimum frequency the VCO is capable of producing.
          **/
-        uint16_t min;
-        
+        std::uint16_t min;
+
         /**
          * Maximum frequency the VCO is capable of producing.
          **/
-        uint16_t max;
+        std::uint16_t max;
     };
 
     /**
@@ -171,7 +172,7 @@ public:
      * channels.
      * @return The reference frequency in Hz.
      **/
-    uint32_t get_reference();
+    std::uint32_t get_reference();
     
     /**
      * Read the current reference frequency. This is shared between the two
@@ -179,7 +180,7 @@ public:
      * @param[out] reference Receives the reference frequency in Hz.
      * @return True on successful completion.
      **/
-    bool get_reference(uint32_t &reference);
+    bool get_reference(std::uint32_t &reference);
     
     /**
      * Set the synthesizer reference frequency. This does not change the actual
@@ -188,7 +189,7 @@ public:
      * @param reference The new reference frequency in Hz.
      * @return True on successful completion.
      **/
-    bool set_reference(uint32_t reference);
+    bool set_reference(std::uint32_t reference);
 
     /**
      * \}
@@ -202,7 +203,7 @@ public:
      * @param synth The synthesizer to be read.
      * @return The RF level in dbm.
      **/
-    int32_t get_rf_level(enum Synthesizer synth);
+    std::int32_t get_rf_level(enum Synthesizer synth);
 
     /**
      * Get the synthesizer RF output level. The output can be set to four
@@ -211,7 +212,7 @@ public:
      * @param[out] rf_level The RF level in dbm.
      * @return True on successful completion.
      **/
-    bool get_rf_level(enum Synthesizer synth, int32_t &rf_level);
+    bool get_rf_level(enum Synthesizer synth, std::int32_t &rf_level);
 
     /**
      * Set the synthesizer RF output level. The output can be set to four
@@ -220,7 +221,7 @@ public:
      * @param rf_level The RF level in dbm.
      * @return True on successful completion.
      **/
-    bool set_rf_level(enum Synthesizer synth, int32_t rf_level);
+    bool set_rf_level(enum Synthesizer synth, std::int32_t rf_level);
 
     /**
      * \}
@@ -352,33 +353,37 @@ public:
      **/
     bool flash();
 
+    // Utilities for directly manipulating the configuration registers
+    bool get_all_registers(enum Synthesizer synth,
+                           reg0_t &r0, reg1_t &r1,
+                           reg2_t &r2, reg3_t &r3,
+                           reg4_t &r4, reg5_t &r5);
+    bool set_all_registers(enum Synthesizer synth,
+                           const reg0_t &r0, const reg1_t &r1,
+                           const reg2_t &r2, const reg3_t &r3,
+                           const reg4_t &r4, const reg5_t &r5);
+
 private:
     enum { ACK  = 0x06,
            NACK = 0x15 };
-
-    struct registers
-    {
-        uint32_t ncount;
-        uint32_t frac;
-        uint32_t mod;
-        uint32_t dbf;
-    };
 
     // Calculate effective phase detector frequency
     float getEPDF(enum Synthesizer synth);
 
     // Checksum
-    uint8_t generate_checksum(const uint8_t*, size_t);
-    bool verify_checksum(const uint8_t*, size_t, uint8_t);
-
-    // Register formatting
-    void pack_freq_registers(const registers &regs, uint8_t *bytes);
-    void unpack_freq_registers(const uint8_t *bytes, registers &regs);
-
-    void pack_int(uint32_t num, uint8_t *bytes);
-    void pack_short(uint16_t num, uint8_t *bytes);
-    void unpack_int(const uint8_t *bytes, uint32_t &num);
-    void unpack_short(const uint8_t *bytes, uint16_t &num);
+    std::uint8_t generate_checksum(const std::uint8_t*, std::size_t);
+    bool verify_checksum(const std::uint8_t*, std::size_t, std::uint8_t);
+    // Register retrieval formatting
+    bool read_freq_registers(enum ValonSynth::Synthesizer synth,
+                             std::uint32_t &ncount, std::uint32_t &frac,
+                             std::uint32_t &mod, std::uint32_t &dbf);
+    bool write_freq_registers(enum ValonSynth::Synthesizer synth,
+                              std::uint32_t ncount, std::uint32_t frac,
+                              std::uint32_t mod, std::uint32_t dbf);
+    void pack_int(std::uint32_t num, std::uint8_t *bytes);
+    void pack_short(std::uint16_t num, std::uint8_t *bytes);
+    void unpack_int(const std::uint8_t *bytes, std::uint32_t &num);
+    void unpack_short(const std::uint8_t *bytes, std::uint16_t &num);
     
     Serial s;
 };
@@ -391,18 +396,18 @@ ValonSynth::get_frequency(enum ValonSynth::Synthesizer synth)
     return frequency;
 }
 
-inline uint32_t
+inline std::uint32_t
 ValonSynth::get_reference()
 {
-    uint32_t frequency;
+    std::uint32_t frequency;
     get_reference(frequency);
     return frequency;
 }
 
-inline int32_t
+inline std::int32_t
 ValonSynth::get_rf_level(enum ValonSynth::Synthesizer synth)
 {
-    int32_t rf_level;
+    std::int32_t rf_level;
     get_rf_level(synth, rf_level);
     return rf_level;
 }
