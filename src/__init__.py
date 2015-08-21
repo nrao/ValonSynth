@@ -21,3 +21,5 @@
 #	Green Bank, WV 24944-0002 USA
 
 from valon_synth import Synthesizer, SYNTH_A, SYNTH_B, INT_REF, EXT_REF
+from valon_registers import register0_t, register1_t, register2_t, \
+                            register3_t, register4_t, register5_t
