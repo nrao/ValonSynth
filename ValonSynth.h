@@ -31,6 +31,7 @@
 #include "ValonRegisters.h"
 #include <cstring>
 #include <cstdint>
+#include <tuple>
 
 /**
  * Interface to a Valon 5007 dual synthesizer.
@@ -239,6 +240,7 @@ public:
      * @return True on successful completion.
      **/
     bool get_options(enum Synthesizer synth, struct options &opts);
+    std::tuple<bool, bool, std::uint32_t, bool> get_options(enum Synthesizer synth);
     
     /**
      * Set the options for a synthesizer.
@@ -288,6 +290,7 @@ public:
      * @return True on successful completion.
      **/
     bool get_vco_range(enum Synthesizer synth, vco_range &vcor);
+    std::tuple<std::uint16_t, std::uint16_t> get_vco_range(enum Synthesizer synth);
     
     /**
      * Set the range of the VCO. This affects the allowable frequency range of
@@ -412,12 +415,27 @@ ValonSynth::get_rf_level(enum ValonSynth::Synthesizer synth)
     return rf_level;
 }
 
+inline std::tuple<bool, bool, std::uint32_t, bool>
+ValonSynth::get_options(enum ValonSynth::Synthesizer synth) {
+    options opts;
+    get_options(synth, opts);
+    return std::make_tuple(opts.double_ref, opts.half_ref, opts.r, opts.low_spur);
+}
+
 inline bool
 ValonSynth::get_ref_select()
 {
     bool e_not_i;
     get_ref_select(e_not_i);
     return e_not_i;
+}
+
+inline std::tuple<std::uint16_t, std::uint16_t>
+ValonSynth::get_vco_range(enum ValonSynth::Synthesizer synth)
+{
+    vco_range vcor;
+    get_vco_range(synth, vcor);
+    return std::make_tuple(vcor.min, vcor.max);
 }
 
 inline bool
