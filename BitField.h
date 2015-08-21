@@ -12,6 +12,9 @@ template <typename T, std::size_t Index, std::size_t Width>
 class BitField {
     static_assert(std::is_integral<T>::value,
                   "BitField must use an integral type");
+    static_assert(sizeof(T)*8 >= Index+Width,
+                  "BitField type must be large enough to "
+                  "support the given index and width");
 
     static const T Max = (1U << Width) - 1U;
     static const T Mask = Max << Index;
