@@ -1,6 +1,12 @@
+"""
+Union-like structures to represent registers.
+Intended to make bit-packing easier to grok.
+"""
+
 import ctypes
 
-class register0_t(ctypes.LittleEndianStructure):
+class Register0(ctypes.LittleEndianStructure):
+    "Structure to hold fields of the Valon register 0."
     _fields_ = [
         ('control', ctypes.c_uint32,  3),
         ('frac',    ctypes.c_uint32, 12),
@@ -8,7 +14,8 @@ class register0_t(ctypes.LittleEndianStructure):
         ('',        ctypes.c_uint32,  1)
         ]
 
-class register1_t(ctypes.LittleEndianStructure):
+class Register1(ctypes.LittleEndianStructure):
+    "Structure to hold fields of the Valon register 1."
     _fields_ = [
         ('control',   ctypes.c_uint32,  3),
         ('mod',       ctypes.c_uint32, 12),
@@ -17,7 +24,8 @@ class register1_t(ctypes.LittleEndianStructure):
         ('',          ctypes.c_uint32,  4),
         ]
 
-class register2_t(ctypes.LittleEndianStructure):
+class Register2(ctypes.LittleEndianStructure):
+    "Structure to hold fields of the Valon register 2."
     _fields_ = [
         ('control',        ctypes.c_uint32,  3),
         ('counter_reset',  ctypes.c_uint32,  1),
@@ -36,7 +44,8 @@ class register2_t(ctypes.LittleEndianStructure):
         ('',               ctypes.c_uint32,  1),
         ]
 
-class register3_t(ctypes.LittleEndianStructure):
+class Register3(ctypes.LittleEndianStructure):
+    "Structure to hold fields of the Valon register 3."
     _fields_ = [
         ('control',        ctypes.c_uint32,  3),
         ('clock_div',      ctypes.c_uint32, 12),
@@ -46,7 +55,8 @@ class register3_t(ctypes.LittleEndianStructure):
         ('',               ctypes.c_uint32, 13),
         ]
 
-class register4_t(ctypes.LittleEndianStructure):
+class Register4(ctypes.LittleEndianStructure):
+    "Structure to hold fields of the Valon register 4."
     _fields_ = [
         ('control',               ctypes.c_uint32, 3),
         ('output_power',          ctypes.c_uint32, 2),
@@ -62,7 +72,8 @@ class register4_t(ctypes.LittleEndianStructure):
         ('',                      ctypes.c_uint32, 8),
         ]
 
-class register5_t(ctypes.LittleEndianStructure):
+class Register5(ctypes.LittleEndianStructure):
+    "Structure to hold fields of the Valon register 5."
     _fields_ = [
         ('control',     ctypes.c_uint32,  3),
         ('',            ctypes.c_uint32, 19),
@@ -70,38 +81,44 @@ class register5_t(ctypes.LittleEndianStructure):
         ('',            ctypes.c_uint32,  8),
         ]
 
-class reg0_t(ctypes.Union):
+class Reg0(ctypes.Union):
+    "Union to alias Register0 type as an endian-aware integer."
     _fields_ = [
-        ('reg', register0_t),
+        ('reg', Register0),
         ('asbyte', ctypes.c_uint32)
         ]
 
-class reg1_t(ctypes.Union):
+class Reg1(ctypes.Union):
+    "Union to alias Register1 type as an endian-aware integer."
     _fields_ = [
-        ('reg', register1_t),
+        ('reg', Register1),
         ('asbyte', ctypes.c_uint32)
         ]
 
-class reg2_t(ctypes.Union):
+class Reg2(ctypes.Union):
+    "Union to alias Register2 type as an endian-aware integer."
     _fields_ = [
-        ('reg', register2_t),
+        ('reg', Register2),
         ('asbyte', ctypes.c_uint32)
         ]
 
-class reg3_t(ctypes.Union):
+class Reg3(ctypes.Union):
+    "Union to alias Register3 type as an endian-aware integer."
     _fields_ = [
-        ('reg', register3_t),
+        ('reg', Register3),
         ('asbyte', ctypes.c_uint32)
         ]
 
-class reg4_t(ctypes.Union):
+class Reg4(ctypes.Union):
+    "Union to alias Register4 type as an endian-aware integer."
     _fields_ = [
-        ('reg', register4_t),
+        ('reg', Register4),
         ('asbyte', ctypes.c_uint32)
         ]
 
-class reg5_t(ctypes.Union):
+class Reg5(ctypes.Union):
+    "Union to alias Register5 type as an endian-aware integer."
     _fields_ = [
-        ('reg', register5_t),
+        ('reg', Register5),
         ('asbyte', ctypes.c_uint32)
         ]

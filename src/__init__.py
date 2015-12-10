@@ -20,6 +20,10 @@
 #	P. O. Box 2
 #	Green Bank, WV 24944-0002 USA
 
+"""
+Import for ValonSynth.
+"""
+
 from valon_synth import Synthesizer, SYNTH_A, SYNTH_B, INT_REF, EXT_REF
-from valon_registers import register0_t, register1_t, register2_t, \
-                            register3_t, register4_t, register5_t
+from valon_registers import Register0, Register1, Register2, \
+                            Register3, Register4, Register5
