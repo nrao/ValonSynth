@@ -48,37 +48,42 @@ EXT_REF = 0x01
 ACK = 0x06
 NACK = 0x15
 
+def _generate_checksum(data):
+    "Generate a checksum for the data provided."
+    return chr(sum([ord(b) for b in data]) % 256)
+
+def _verify_checksum(data, checksum):
+    "Verify a checksum for the data provided."
+    return (_generate_checksum(data) == checksum)
+
+def _pack_freq_registers(ncount, frac, mod, dbf, old_data):
+    "Do bit packing for the frequency setting registers."
+    dbf_table = {1: 0, 2: 1, 4: 2, 8: 3, 16: 4}
+    reg0, reg1, reg2, reg3, reg4, reg5 = struct.unpack('>IIIIII', old_data)
+    reg0 &= 0x80000007
+    reg0 |= ((ncount & 0xffff) << 15) | ((frac & 0x0fff) << 3)
+    reg1 &= 0xffff8007
+    reg1 |= (mod & 0x0fff) << 3
+    reg4 &= 0xff8fffff
+    reg4 |= (dbf_table.get(dbf, 0)) << 20
+    return struct.pack('>IIIIII', reg0, reg1, reg2, reg3, reg4, reg5)
+
+def _unpack_freq_registers(data):
+    "Do bit unpacking for the frequency setting registers."
+    dbf_rev_table = {0: 1, 1: 2, 2: 4, 3: 8, 4: 16}
+    reg0, reg1, _, _, reg4, _ = struct.unpack('>IIIIII', data)
+    ncount = (reg0 >> 15) & 0xffff
+    frac = (reg0 >> 3) & 0x0fff
+    mod = (reg1 >> 3) & 0x0fff
+    dbf = dbf_rev_table.get((reg4 >> 20) & 0x07, 1)
+    return ncount, frac, mod, dbf
+
 class Synthesizer:
+    """A simple interface to the Valon 500x synthesizer."""
     def __init__(self, port):
         self.conn = serial.Serial(None, 9600, serial.EIGHTBITS,
                                   serial.PARITY_NONE, serial.STOPBITS_ONE)
         self.conn.setPort(port)
-
-    def _generate_checksum(self, bytes):
-        return chr(sum([ord(b) for b in bytes]) % 256)
-
-    def _verify_checksum(self, bytes, checksum):
-        return (self._generate_checksum(bytes) == checksum)
-
-    def _pack_freq_registers(self, ncount, frac, mod, dbf, old_bytes):
-        dbf_table = {1: 0, 2: 1, 4: 2, 8: 3, 16: 4}
-        reg0, reg1, reg2, reg3, reg4, reg5 = struct.unpack('>IIIIII', old_bytes)
-        reg0 &= 0x80000007
-        reg0 |= ((ncount & 0xffff) << 15) | ((frac & 0x0fff) << 3)
-        reg1 &= 0xffff8007
-        reg1 |= (mod & 0x0fff) << 3
-        reg4 &= 0xff8fffff
-        reg4 |= (dbf_table.get(dbf, 0)) << 20
-        return struct.pack('>IIIIII', reg0, reg1, reg2, reg3, reg4, reg5)
-
-    def _unpack_freq_registers(self, bytes):
-        dbf_rev_table = {0: 1, 1: 2, 2: 4, 3: 8, 4: 16}
-        reg0, reg1, reg2, reg3, reg4, reg5 = struct.unpack('>IIIIII', bytes)
-        ncount = (reg0 >> 15) & 0xffff
-        frac = (reg0 >> 3) & 0x0fff
-        mod = (reg1 >> 3) & 0x0fff
-        dbf = dbf_rev_table.get((reg4 >> 20) & 0x07, 1)
-        return ncount, frac, mod, dbf
 
     def get_frequency(self, synth):
         """
@@ -90,15 +95,15 @@ class Synthesizer:
         @return: the frequency in MHz (float)
         """
         self.conn.open()
-        bytes = struct.pack('>B', 0x80 | synth)
-        self.conn.write(bytes)
-        bytes = self.conn.read(24)
+        data = struct.pack('>B', 0x80 | synth)
+        self.conn.write(data)
+        data = self.conn.read(24)
         checksum = self.conn.read(1)
         self.conn.close()
-        #self._verify_checksum(bytes, checksum)
-        ncount, frac, mod, dbf = self._unpack_freq_registers(bytes)
-        EPDF = self._getEPDF(synth)
-        return (ncount + float(frac) / mod) * EPDF / dbf
+        #_verify_checksum(data, checksum)
+        ncount, frac, mod, dbf = _unpack_freq_registers(data)
+        epdf = self._get_epdf(synth)
+        return (ncount + float(frac) / mod) * epdf / dbf
 
     def set_frequency(self, synth, freq, chan_spacing = 10.):
         """
@@ -118,17 +123,17 @@ class Synthesizer:
 
         @return: True if success (bool)
         """
-        min, max = self.get_vco_range(synth)
+        low, _ = self.get_vco_range(synth)
         dbf = 1
-        while (freq * dbf) <= min and dbf <= 16:
+        while (freq * dbf) <= low and dbf <= 16:
             dbf *= 2
         if dbf > 16:
             dbf = 16
-        vco = freq * dbf
-        EPDF = self._getEPDF(synth)
-        ncount = int(vco / EPDF)
-        frac = int((vco - ncount * float(EPDF)) / chan_spacing + 0.5)
-        mod = int(EPDF / float(chan_spacing) + 0.5)
+            vco = freq * dbf
+            epdf = self._get_epdf(synth)
+            ncount = int(vco / epdf)
+            frac = int((vco - ncount * float(epdf)) / chan_spacing + 0.5)
+            mod = int(epdf / float(chan_spacing) + 0.5)
         if frac != 0 and mod != 0:
             while not (frac & 1) and not (mod & 1):
                 frac /= 2
@@ -136,20 +141,20 @@ class Synthesizer:
         else:
             frac = 0
             mod = 1
-        self.conn.open()
-        bytes = struct.pack('>B', 0x80 | synth)
-        self.conn.write(bytes)
-        old_bytes = self.conn.read(24)
-        checksum = self.conn.read(1)
-        #self._verify_checksum(old_bytes, checksum)
-        bytes = struct.pack('>B24s', 0x00 | synth,
-                            self._pack_freq_registers(ncount, frac, mod,
-                                                      dbf, old_bytes))
-        checksum = self._generate_checksum(bytes)
-        self.conn.write(bytes + checksum)
-        bytes = self.conn.read(1)
+            self.conn.open()
+            data = struct.pack('>B', 0x80 | synth)
+            self.conn.write(data)
+            old_data = self.conn.read(24)
+            checksum = self.conn.read(1)
+            #_verify_checksum(old_data, checksum)
+        data = struct.pack('>B24s', 0x00 | synth,
+                           _pack_freq_registers(ncount, frac, mod,
+                                                dbf, old_data))
+        checksum = _generate_checksum(data)
+        self.conn.write(data + checksum)
+        data = self.conn.read(1)
         self.conn.close()
-        ack = struct.unpack('>B', bytes)[0]
+        ack = struct.unpack('>B', data)[0]
         return ack == ACK
 
     def get_reference(self):
@@ -157,13 +162,13 @@ class Synthesizer:
         Get reference frequency in MHz
         """
         self.conn.open()
-        bytes = struct.pack('>B', 0x81)
-        self.conn.write(bytes)
-        bytes = self.conn.read(4)
+        data = struct.pack('>B', 0x81)
+        self.conn.write(data)
+        data = self.conn.read(4)
         checksum = self.conn.read(1)
         self.conn.close()
-        #self._verify_checksum(bytes, checksum)
-        freq = struct.unpack('>I', bytes)[0]
+        #_verify_checksum(data, checksum)
+        freq = struct.unpack('>I', data)[0]
         return freq
 
     def set_reference(self, freq):
@@ -176,12 +181,12 @@ class Synthesizer:
         @return: True if success (bool)
         """
         self.conn.open()
-        bytes = struct.pack('>BI', 0x01, freq)
-        checksum = self._generate_checksum(bytes)
-        self.conn.write(bytes + checksum)
-        bytes = self.conn.read(1)
+        data = struct.pack('>BI', 0x01, freq)
+        checksum = _generate_checksum(data)
+        self.conn.write(data + checksum)
+        data = self.conn.read(1)
         self.conn.close()
-        ack = struct.unpack('>B', bytes)[0]
+        ack = struct.unpack('>B', data)[0]
         return ack == ACK
 
     def get_rf_level(self, synth):
@@ -195,13 +200,13 @@ class Synthesizer:
         """
         rfl_table = {0: -4, 1: -1, 2: 2, 3: 5}
         self.conn.open()
-        bytes = struct.pack('>B', 0x80 | synth)
-        self.conn.write(bytes)
-        bytes = self.conn.read(24)
+        data = struct.pack('>B', 0x80 | synth)
+        self.conn.write(data)
+        data = self.conn.read(24)
         checksum = self.conn.read(1)
         self.conn.close()
-        #self._verify_checksum(bytes, checksum)
-        reg0, reg1, reg2, reg3, reg4, reg5 = struct.unpack('>IIIIII', bytes)
+        #_verify_checksum(data, checksum)
+        _, _, _, _, reg4, _ = struct.unpack('>IIIIII', data)
         rfl = (reg4 >> 3) & 0x03
         rf_level = rfl_table.get(rfl)
         return rf_level
@@ -220,23 +225,24 @@ class Synthesizer:
         """
         rfl_rev_table = {-4: 0, -1: 1, 2: 2, 5: 3}
         rfl = rfl_rev_table.get(rf_level)
-        if(rfl is None): return False
+        if(rfl is None):
+            return False
         self.conn.open()
-        bytes = struct.pack('>B', 0x80 | synth)
-        self.conn.write(bytes)
-        bytes = self.conn.read(24)
+        data = struct.pack('>B', 0x80 | synth)
+        self.conn.write(data)
+        data = self.conn.read(24)
         checksum = self.conn.read(1)
-        #self._verify_checksum(bytes, checksum)
-        reg0, reg1, reg2, reg3, reg4, reg5 = struct.unpack('>IIIIII', bytes)
+        #_verify_checksum(data, checksum)
+        reg0, reg1, reg2, reg3, reg4, reg5 = struct.unpack('>IIIIII', data)
         reg4 &= 0xffffffe7
         reg4 |= (rfl & 0x03) << 3
-        bytes = struct.pack('>BIIIIII', 0x00 | synth,
+        data = struct.pack('>BIIIIII', 0x00 | synth,
                             reg0, reg1, reg2, reg3, reg4, reg5)
-        checksum = self._generate_checksum(bytes)
-        self.conn.write(bytes + checksum)
-        bytes = self.conn.read(1)
+        checksum = _generate_checksum(data)
+        self.conn.write(data + checksum)
+        data = self.conn.read(1)
         self.conn.close()
-        ack = struct.unpack('>B', bytes)[0]
+        ack = struct.unpack('>B', data)[0]
         return ack == ACK
 
     def get_options(self, synth):
@@ -255,37 +261,38 @@ class Synthesizer:
         @return: double (bool), half (bool), r (int), low_spur (bool)
         """
         self.conn.open()
-        bytes = struct.pack('>B', 0x80 | synth)
-        self.conn.write(bytes)
-        bytes = self.conn.read(24)
+        data = struct.pack('>B', 0x80 | synth)
+        self.conn.write(data)
+        data = self.conn.read(24)
         checksum = self.conn.read(1)
         self.conn.close()
-        #self._verify_checksum(bytes, checksum)
-        reg0, reg1, reg2, reg3, reg4, reg5 = struct.unpack('>IIIIII', bytes)
+        #_verify_checksum(data, checksum)
+        _, _, reg2, _, _, _ = struct.unpack('>IIIIII', data)
         low_spur = ((reg2 >> 30) & 1) & ((reg2 >> 29) & 1)
         double = (reg2 >> 25) & 1
         half = (reg2 >> 24) & 1
-        r = (reg2 >> 14) & 0x03ff
-        return double, half, r, low_spur
+        divider = (reg2 >> 14) & 0x03ff
+        return double, half, divider, low_spur
 
-    def set_options(self, synth, double = 0, half = 0, r = 1, low_spur = 0):
+    def set_options(self, synth, double = 0, half = 0, divider = 1,
+                    low_spur = 0):
         """
         Set options.
-        
+
         double and half both True is same as both False.
 
         @param synth : synthesizer base address
         @type  synth : int
-        
+
         @param double : if 1, reference frequency is doubled; default 0
         @type  double : int
-        
+
         @param half : if 1, reference frequency is halved; default 0
         @type  half : int
-        
-        @param r : reference frequency divisor; default 1
-        @type  r : int
-        
+
+        @param divider : reference frequency divisor; default 1
+        @type  divider : int
+
         @param low_spur : if 1, minimizes PLL spurs;
                           if 0, minimizes phase noise; default 0
         @type  low_spur : int
@@ -293,23 +300,23 @@ class Synthesizer:
         @return: True if success (bool)
         """
         self.conn.open()
-        bytes = struct.pack('>B', 0x80 | synth)
-        self.conn.write(bytes)
-        bytes = self.conn.read(24)
+        data = struct.pack('>B', 0x80 | synth)
+        self.conn.write(data)
+        data = self.conn.read(24)
         checksum = self.conn.read(1)
-        #self._verify_checksum(bytes, checksum)
-        reg0, reg1, reg2, reg3, reg4, reg5 = struct.unpack('>IIIIII', bytes)
+        #_verify_checksum(data, checksum)
+        reg0, reg1, reg2, reg3, reg4, reg5 = struct.unpack('>IIIIII', data)
         reg2 &= 0x9c003fff
-        reg2 |= (((low_spur & 1) << 30) | ((low_spur & 1) << 29) | 
+        reg2 |= (((low_spur & 1) << 30) | ((low_spur & 1) << 29) |
                  ((double & 1) << 25) | ((half & 1) << 24) |
-                 ((r & 0x03ff) << 14))
-        bytes = struct.pack('>BIIIIII', 0x00 | synth,
+                 ((divider & 0x03ff) << 14))
+        data = struct.pack('>BIIIIII', 0x00 | synth,
                             reg0, reg1, reg2, reg3, reg4, reg5)
-        checksum = self._generate_checksum(bytes)
-        self.conn.write(bytes + checksum)
-        bytes = self.conn.read(1)
+        checksum = _generate_checksum(data)
+        self.conn.write(data + checksum)
+        data = self.conn.read(1)
         self.conn.close()
-        ack = struct.unpack('>B', bytes)[0]
+        ack = struct.unpack('>B', data)[0]
         return ack == ACK
 
     def get_ref_select(self):
@@ -318,13 +325,13 @@ class Synthesizer:
         Returns 1 if the external reference is selected, 0 otherwise.
         """
         self.conn.open()
-        bytes = struct.pack('>B', 0x86)
-        self.conn.write(bytes)
-        bytes = self.conn.read(1)
+        data = struct.pack('>B', 0x86)
+        self.conn.write(data)
+        data = self.conn.read(1)
         checksum = self.conn.read(1)
         self.conn.close()
-        #self._verify_checksum(bytes, checksum)
-        is_ext = struct.unpack('>B', bytes)[0]
+        #_verify_checksum(data, checksum)
+        is_ext = struct.unpack('>B', data)[0]
         return is_ext & 1
 
     def set_ref_select(self, e_not_i = 1):
@@ -337,12 +344,12 @@ class Synthesizer:
         @return: True if success (bool)
         """
         self.conn.open()
-        bytes = struct.pack('>BB', 0x06, e_not_i & 1)
-        checksum = self._generate_checksum(bytes)
-        self.conn.write(bytes + checksum)
-        bytes = self.conn.read(1)
+        data = struct.pack('>BB', 0x06, e_not_i & 1)
+        checksum = _generate_checksum(data)
+        self.conn.write(data + checksum)
+        data = self.conn.read(1)
         self.conn.close()
-        ack = struct.unpack('>B', bytes)[0]
+        ack = struct.unpack('>B', data)[0]
         return ack == ACK
 
     def get_vco_range(self, synth):
@@ -355,16 +362,15 @@ class Synthesizer:
         @return: min,max in MHz
         """
         self.conn.open()
-        bytes = struct.pack('>B', 0x83 | synth)
-        self.conn.write(bytes)
-        bytes = self.conn.read(4)
+        data = struct.pack('>B', 0x83 | synth)
+        self.conn.write(data)
+        data = self.conn.read(4)
         checksum = self.conn.read(1)
         self.conn.close()
-        #self._verify_checksum(bytes, checksum)
-        min, max = struct.unpack('>HH', bytes)
-        return min, max
+        #_verify_checksum(data, checksum)
+        return struct.unpack('>HH', data)
 
-    def set_vco_range(self, synth, min, max):
+    def set_vco_range(self, synth, low, high):
         """
         Sets VCO range.
 
@@ -380,12 +386,12 @@ class Synthesizer:
         @return: True if success (bool)
         """
         self.conn.open()
-        bytes = struct.pack('>BHH', 0x03 | synth, min, max)
-        checksum = self._generate_checksum(bytes)
-        self.conn.write(bytes + checksum)
-        bytes = self.conn.read(1)
+        data = struct.pack('>BHH', 0x03 | synth, low, high)
+        checksum = _generate_checksum(data)
+        self.conn.write(data + checksum)
+        data = self.conn.read(1)
         self.conn.close()
-        ack = struct.unpack('>B', bytes)[0]
+        ack = struct.unpack('>B', data)[0]
         return ack == ACK
 
     def get_phase_lock(self, synth):
@@ -398,14 +404,14 @@ class Synthesizer:
         @return: True if locked (bool)
         """
         self.conn.open()
-        bytes = struct.pack('>B', 0x86 | synth)
-        self.conn.write(bytes)
-        bytes = self.conn.read(1)
+        data = struct.pack('>B', 0x86 | synth)
+        self.conn.write(data)
+        data = self.conn.read(1)
         checksum = self.conn.read(1)
         self.conn.close()
-        #self._verify_checksum(bytes, checksum)
+        #_verify_checksum(data, checksum)
         mask = (synth << 1) or 0x20
-        lock = struct.unpack('>B', bytes)[0] & mask
+        lock = struct.unpack('>B', data)[0] & mask
         return lock > 0
 
     def get_label(self, synth):
@@ -418,13 +424,13 @@ class Synthesizer:
         @return: str
         """
         self.conn.open()
-        bytes = struct.pack('>B', 0x82 | synth)
-        self.conn.write(bytes)
-        bytes = self.conn.read(16)
+        data = struct.pack('>B', 0x82 | synth)
+        self.conn.write(data)
+        data = self.conn.read(16)
         checksum = self.conn.read(1)
         self.conn.close()
-        #self._verify_checksum(bytes, checksum)
-        return bytes
+        #_verify_checksum(data, checksum)
+        return data
 
     def set_label(self, synth, label):
         """
@@ -433,18 +439,18 @@ class Synthesizer:
         @param synth : synthesizer base address
         @type  synth : int
 
-        @param label : up to 16 bytes of text
+        @param label : up to 16 data of text
         @type  label : str
-        
+
         @return: True if success (bool)
         """
         self.conn.open()
-        bytes = struct.pack('>B16s', 0x02 | synth, label)
-        checksum = self._generate_checksum(bytes)
-        self.conn.write(bytes + checksum)
-        bytes = self.conn.read(1)
+        data = struct.pack('>B16s', 0x02 | synth, label)
+        checksum = _generate_checksum(data)
+        self.conn.write(data + checksum)
+        data = self.conn.read(1)
         self.conn.close()
-        ack = struct.unpack('>B', bytes)[0]
+        ack = struct.unpack('>B', data)[0]
         return ack == ACK
 
     def flash(self):
@@ -454,23 +460,26 @@ class Synthesizer:
         @return: True if success (bool)
         """
         self.conn.open()
-        bytes = struct.pack('>B', 0x40)
-        checksum = self._generate_checksum(bytes)
-        self.conn.write(bytes + checksum)
-        bytes = self.conn.read(1)
+        data = struct.pack('>B', 0x40)
+        checksum = _generate_checksum(data)
+        self.conn.write(data + checksum)
+        data = self.conn.read(1)
         self.conn.close()
-        ack = struct.unpack('>B', bytes)[0]
+        ack = struct.unpack('>B', data)[0]
         return ack == ACK
 
-    def _getEPDF(self, synth):
+    def _get_epdf(self, synth):
         """
         Returns effective phase detector frequency.
 
         This is the reference frequency with options applied.
         """
         reference = self.get_reference() / 1e6
-        double, half, r, low_spur = self.get_options(synth)
-        if(double): reference *= 2.0
-        if(half):   reference /= 2.0
-        if(r > 1):  reference /= r
+        double, half, divider, _ = self.get_options(synth)
+        if(double):
+            reference *= 2.0
+        if(half):
+            reference /= 2.0
+        if(divider > 1):
+            reference /= divider
         return reference
