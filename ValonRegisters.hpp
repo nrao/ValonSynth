@@ -1,9 +1,11 @@
-#ifndef VALONREGISTERS_H
-#define VALONREGISTERS_H
+#ifndef VALONREGISTERS_HPP
+#define VALONREGISTERS_HPP
 
-#include "BitField.h"
+#include "BitField.hpp"
 
-union reg0_t {
+namespace Valon {
+
+union Register0_t {
     std::uint32_t asbyte;
 
     BitField<std::uint32_t,  0,  3> control;
@@ -12,7 +14,7 @@ union reg0_t {
   //BitField<std::uint32_t, 31,  1> reserved;
 };
 
-union reg1_t {
+union Register1_t {
     std::uint32_t asbyte;
 
     BitField<std::uint32_t,  0,  3> control;
@@ -22,7 +24,7 @@ union reg1_t {
   //BitField<std::uint32_t, 28,  4> reserved;
 };
 
-union reg2_t {
+union Register2_t {
     std::uint32_t asbyte;
 
     BitField<std::uint32_t,  0,  3> control;
@@ -42,7 +44,7 @@ union reg2_t {
   //BitField<std::uint32_t, 31,  1> reserved;
 };
 
-union reg3_t {
+union Register3_t {
     std::uint32_t asbyte;
 
     BitField<std::uint32_t,  0,  3> control;
@@ -53,7 +55,7 @@ union reg3_t {
   //BitField<std::uint32_t, 19, 13> reserved;
 };
 
-union reg4_t {
+union Register4_t {
     std::uint32_t asbyte;
 
     BitField<std::uint32_t,  0, 3> control;
@@ -70,7 +72,7 @@ union reg4_t {
   //BitField<std::uint32_t, 24, 8> reserved;
 };
 
-union reg5_t {
+union Register5_t {
     std::uint32_t asbyte;
 
     BitField<std::uint32_t,  0,  3> control;
@@ -79,4 +81,6 @@ union reg5_t {
   //BitField<std::uint32_t, 24,  8> reserved;
 };
 
-#endif//VALONREGISTERS_H
+} // namespace Valon
+
+#endif//VALONREGISTERS_HPP

@@ -1,5 +1,5 @@
-#ifndef BITFIELD_H
-#define BITFIELD_H
+#ifndef BITFIELD_HPP
+#define BITFIELD_HPP
 
 // Credit to Evan Teran for the idea:
 // http://blog.codef00.com/2014/12/06/portable-bitfields-using-c11/
@@ -29,10 +29,7 @@ public:
         return (value >> Index) & Max;
     }
 
-#if (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5) || defined(__clang__)
-    explicit
-#endif
-    operator bool() const {
+    explicit operator bool() const {
         return value & Mask;
     }
 
@@ -65,4 +62,4 @@ private:
     T value;
 };
 
-#endif//BITFIELD_H
+#endif//BITFIELD_HPP
