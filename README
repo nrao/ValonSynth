@@ -1,8 +1,11 @@
-This branch is a testbed for experimental features.
+This branch is a testbed for exploring C++11/14 features.
 
 This software provides ABSOLUTELY NO GUARANTEE that you will not brick or otherwise render your Valon inoperable if you use it, correctly or incorrectly.
 
 User beware.
+
+2016-01-06:
+* Refactored C++ code to allow more flexibility in interfacing by using boost::asio.
 
 2015-05-06:
 
