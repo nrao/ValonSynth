@@ -129,11 +129,11 @@ class Synthesizer:
             dbf *= 2
         if dbf > 16:
             dbf = 16
-            vco = freq * dbf
-            epdf = self._get_epdf(synth)
-            ncount = int(vco / epdf)
-            frac = int((vco - ncount * float(epdf)) / chan_spacing + 0.5)
-            mod = int(epdf / float(chan_spacing) + 0.5)
+        vco = freq * dbf
+        epdf = self._get_epdf(synth)
+        ncount = int(vco / epdf)
+        frac = int((vco - ncount * float(epdf)) / chan_spacing + 0.5)
+        mod = int(epdf / float(chan_spacing) + 0.5)
         if frac != 0 and mod != 0:
             while not (frac & 1) and not (mod & 1):
                 frac /= 2
@@ -141,12 +141,12 @@ class Synthesizer:
         else:
             frac = 0
             mod = 1
-            self.conn.open()
-            data = struct.pack('>B', 0x80 | synth)
-            self.conn.write(data)
-            old_data = self.conn.read(24)
-            checksum = self.conn.read(1)
-            #_verify_checksum(old_data, checksum)
+        self.conn.open()
+        data = struct.pack('>B', 0x80 | synth)
+        self.conn.write(data)
+        old_data = self.conn.read(24)
+        checksum = self.conn.read(1)
+        #_verify_checksum(old_data, checksum)
         data = struct.pack('>B24s', 0x00 | synth,
                            _pack_freq_registers(ncount, frac, mod,
                                                 dbf, old_data))
